@@ -1,0 +1,51 @@
+[workspace]
+channels = ["conda-forge", "bioconda", "nclibz"]
+name = "DeepOceanEukaryotes"
+platforms = ["linux-64"]
+
+[environments]
+default = ["main"]
+phylofisher = ["phylofisher"]
+barrnap = ["barrnap"]
+trnascan = ["trnascan"]
+isiteuk = ["isiteuk"]
+coverm = ["coverm"]
+
+[feature.main.dependencies]
+python = ">=3.8"
+biopython = "*"
+extern = "*"
+bird_tool_utils_python = "*"
+snakemake = ">=8"
+snakemake-executor-plugin-cluster-generic = ">=1"
+polars = "*"
+xlsx2csv = "*"
+
+[feature.phylofisher.dependencies]
+phylofisher = "*"
+mamba = "*"
+peewee = "*"
+
+[feature.phylofisher.activation]
+env = { PHYLOFISHER_DB = "/work/microbiome/users/aroneys/db/phylofisher/1.2.14/PhyloFisherDatabase_v1.0/database" }
+
+[feature.phylofisher.tasks]
+snakemake_local = "PYTHONPATH=/home/aroneys/src/PhyloFisher snakemake"
+
+[feature.barrnap.dependencies]
+pybarrnap = "==0.5.1"
+
+[feature.trnascan.dependencies]
+"trnascan-se" = "==2.0.12"
+
+[feature.isiteuk.dependencies]
+python = ">=3.7,<3.12"
+singlem = ">=0.16.0"
+polars = "0.20.*"
+diamond = ">=2.1.7,<2.1.11"
+
+[feature.isiteuk.tasks]
+isiteuk = "PATH=/home/aroneys/src/singlem/bin:$PATH PYTHONPATH=/home/aroneys/src/singlem TMPDIR=/work/microbiome/ibis/deep_ocean/results/isiteuk /home/aroneys/src/isiteuk/bin/isiteuk"
+
+[feature.coverm.dependencies]
+coverm = "0.7.*"

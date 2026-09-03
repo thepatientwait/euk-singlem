@@ -1,0 +1,3302 @@
+Support for alternative conda frontends has been deprecated in favor of simpler support and code base. This should not cause issues since current conda releases rely on fast solving via libmamba. Ignoring the alternative conda frontend setting (mamba).
+host: aquarius02
+Building DAG of jobs...
+Job stats:
+job                              count
+-----------------------------  -------
+build_external_manifest_table        1
+merge_gene_fastas                  129
+famsa                              129
+summarize_external_eukcc             1
+bmge                               129
+generate_metadata                    1
+generate_alignment                   1
+build_tree                           1
+all                                  1
+total                              393
+
+
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1739576at2759.faa
+    output: output/merged_input/1739576at2759.faa
+    jobid: 149
+    reason: Forced execution
+    wildcards: gene=1739576at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/421002at2759.faa
+    output: output/merged_input/421002at2759.faa
+    jobid: 329
+    reason: Forced execution
+    wildcards: gene=421002at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10249309at2759.faa
+    output: output/merged_input/10249309at2759.faa
+    jobid: 14
+    reason: Forced execution
+    wildcards: gene=10249309at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10265695at2759.faa
+    output: output/merged_input/10265695at2759.faa
+    jobid: 104
+    reason: Forced execution
+    wildcards: gene=10265695at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/296793at2759.faa
+    output: output/merged_input/296793at2759.faa
+    jobid: 284
+    reason: Forced execution
+    wildcards: gene=296793at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/20844at2759.faa
+    output: output/merged_input/20844at2759.faa
+    jobid: 194
+    reason: Forced execution
+    wildcards: gene=20844at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/674963at2759.faa
+    output: output/merged_input/674963at2759.faa
+    jobid: 374
+    reason: Forced execution
+    wildcards: gene=674963at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10256122at2759.faa
+    output: output/merged_input/10256122at2759.faa
+    jobid: 59
+    reason: Forced execution
+    wildcards: gene=10256122at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/272245at2759.faa
+    output: output/merged_input/272245at2759.faa
+    jobid: 239
+    reason: Forced execution
+    wildcards: gene=272245at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10256606at2759.faa
+    output: output/merged_input/10256606at2759.faa
+    jobid: 62
+    reason: Forced execution
+    wildcards: gene=10256606at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1741719at2759.faa
+    output: output/merged_input/1741719at2759.faa
+    jobid: 152
+    reason: Forced execution
+    wildcards: gene=1741719at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10267031at2759.faa
+    output: output/merged_input/10267031at2759.faa
+    jobid: 107
+    reason: Forced execution
+    wildcards: gene=10267031at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/2187159at2759.faa
+    output: output/merged_input/2187159at2759.faa
+    jobid: 197
+    reason: Forced execution
+    wildcards: gene=2187159at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/30179at2759.faa
+    output: output/merged_input/30179at2759.faa
+    jobid: 287
+    reason: Forced execution
+    wildcards: gene=30179at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/70224at2759.faa
+    output: output/merged_input/70224at2759.faa
+    jobid: 377
+    reason: Forced execution
+    wildcards: gene=70224at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10249667at2759.faa
+    output: output/merged_input/10249667at2759.faa
+    jobid: 17
+    reason: Forced execution
+    wildcards: gene=10249667at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/422663at2759.faa
+    output: output/merged_input/422663at2759.faa
+    jobid: 332
+    reason: Forced execution
+    wildcards: gene=422663at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/272987at2759.faa
+    output: output/merged_input/272987at2759.faa
+    jobid: 242
+    reason: Forced execution
+    wildcards: gene=272987at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/17948at2759.faa
+    output: output/merged_input/17948at2759.faa
+    jobid: 155
+    reason: Forced execution
+    wildcards: gene=17948at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/4249at2759.faa
+    output: output/merged_input/4249at2759.faa
+    jobid: 335
+    reason: Forced execution
+    wildcards: gene=4249at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10267436at2759.faa
+    output: output/merged_input/10267436at2759.faa
+    jobid: 110
+    reason: Forced execution
+    wildcards: gene=10267436at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/30343at2759.faa
+    output: output/merged_input/30343at2759.faa
+    jobid: 290
+    reason: Forced execution
+    wildcards: gene=30343at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10250970at2759.faa
+    output: output/merged_input/10250970at2759.faa
+    jobid: 20
+    reason: Forced execution
+    wildcards: gene=10250970at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/2192561at2759.faa
+    output: output/merged_input/2192561at2759.faa
+    jobid: 200
+    reason: Forced execution
+    wildcards: gene=2192561at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/7396459at2759.faa
+    output: output/merged_input/7396459at2759.faa
+    jobid: 380
+    reason: Forced execution
+    wildcards: gene=7396459at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10261062at2759.faa
+    output: output/merged_input/10261062at2759.faa
+    jobid: 65
+    reason: Forced execution
+    wildcards: gene=10261062at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/273340at2759.faa
+    output: output/merged_input/273340at2759.faa
+    jobid: 245
+    reason: Forced execution
+    wildcards: gene=273340at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1847590at2759.faa
+    output: output/merged_input/1847590at2759.faa
+    jobid: 158
+    reason: Forced execution
+    wildcards: gene=1847590at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10261146at2759.faa
+    output: output/merged_input/10261146at2759.faa
+    jobid: 68
+    reason: Forced execution
+    wildcards: gene=10261146at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/124397at2759.faa
+    output: output/merged_input/124397at2759.faa
+    jobid: 113
+    reason: Forced execution
+    wildcards: gene=124397at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/2195431at2759.faa
+    output: output/merged_input/2195431at2759.faa
+    jobid: 203
+    reason: Forced execution
+    wildcards: gene=2195431at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/8110916at2759.faa
+    output: output/merged_input/8110916at2759.faa
+    jobid: 383
+    reason: Forced execution
+    wildcards: gene=8110916at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/274828at2759.faa
+    output: output/merged_input/274828at2759.faa
+    jobid: 248
+    reason: Forced execution
+    wildcards: gene=274828at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/308449at2759.faa
+    output: output/merged_input/308449at2759.faa
+    jobid: 293
+    reason: Forced execution
+    wildcards: gene=308449at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/431825at2759.faa
+    output: output/merged_input/431825at2759.faa
+    jobid: 338
+    reason: Forced execution
+    wildcards: gene=431825at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10251185at2759.faa
+    output: output/merged_input/10251185at2759.faa
+    jobid: 23
+    reason: Forced execution
+    wildcards: gene=10251185at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/18786at2759.faa
+    output: output/merged_input/18786at2759.faa
+    jobid: 161
+    reason: Forced execution
+    wildcards: gene=18786at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/437331at2759.faa
+    output: output/merged_input/437331at2759.faa
+    jobid: 341
+    reason: Forced execution
+    wildcards: gene=437331at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/125856at2759.faa
+    output: output/merged_input/125856at2759.faa
+    jobid: 116
+    reason: Forced execution
+    wildcards: gene=125856at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/311633at2759.faa
+    output: output/merged_input/311633at2759.faa
+    jobid: 296
+    reason: Forced execution
+    wildcards: gene=311633at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10251574at2759.faa
+    output: output/merged_input/10251574at2759.faa
+    jobid: 26
+    reason: Forced execution
+    wildcards: gene=10251574at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/2196187at2759.faa
+    output: output/merged_input/2196187at2759.faa
+    jobid: 206
+    reason: Forced execution
+    wildcards: gene=2196187at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/844at2759.faa
+    output: output/merged_input/844at2759.faa
+    jobid: 386
+    reason: Forced execution
+    wildcards: gene=844at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10261918at2759.faa
+    output: output/merged_input/10261918at2759.faa
+    jobid: 71
+    reason: Forced execution
+    wildcards: gene=10261918at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/27543at2759.faa
+    output: output/merged_input/27543at2759.faa
+    jobid: 251
+    reason: Forced execution
+    wildcards: gene=27543at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10262062at2759.faa
+    output: output/merged_input/10262062at2759.faa
+    jobid: 74
+    reason: Forced execution
+    wildcards: gene=10262062at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1898821at2759.faa
+    output: output/merged_input/1898821at2759.faa
+    jobid: 164
+    reason: Forced execution
+    wildcards: gene=1898821at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/441223at2759.faa
+    output: output/merged_input/441223at2759.faa
+    jobid: 344
+    reason: Forced execution
+    wildcards: gene=441223at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/15082at2759.faa
+    output: output/merged_input/15082at2759.faa
+    jobid: 119
+    reason: Forced execution
+    wildcards: gene=15082at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/3142434at2759.faa
+    output: output/merged_input/3142434at2759.faa
+    jobid: 299
+    reason: Forced execution
+    wildcards: gene=3142434at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10252281at2759.faa
+    output: output/merged_input/10252281at2759.faa
+    jobid: 29
+    reason: Forced execution
+    wildcards: gene=10252281at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/243313at2759.faa
+    output: output/merged_input/243313at2759.faa
+    jobid: 209
+    reason: Forced execution
+    wildcards: gene=243313at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/88at2759.faa
+    output: output/merged_input/88at2759.faa
+    jobid: 389
+    reason: Forced execution
+    wildcards: gene=88at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/277175at2759.faa
+    output: output/merged_input/277175at2759.faa
+    jobid: 254
+    reason: Forced execution
+    wildcards: gene=277175at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/189968at2759.faa
+    output: output/merged_input/189968at2759.faa
+    jobid: 167
+    reason: Forced execution
+    wildcards: gene=189968at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/441771at2759.faa
+    output: output/merged_input/441771at2759.faa
+    jobid: 347
+    reason: Forced execution
+    wildcards: gene=441771at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/15808at2759.faa
+    output: output/merged_input/15808at2759.faa
+    jobid: 122
+    reason: Forced execution
+    wildcards: gene=15808at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/3370at2759.faa
+    output: output/merged_input/3370at2759.faa
+    jobid: 302
+    reason: Forced execution
+    wildcards: gene=3370at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10252405at2759.faa
+    output: output/merged_input/10252405at2759.faa
+    jobid: 32
+    reason: Forced execution
+    wildcards: gene=10252405at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/248751at2759.faa
+    output: output/merged_input/248751at2759.faa
+    jobid: 212
+    reason: Forced execution
+    wildcards: gene=248751at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule build_external_manifest_table:
+    output: output/external/metadata/external_genomes.tsv
+    jobid: 392
+    reason: Forced execution
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10262308at2759.faa
+    output: output/merged_input/10262308at2759.faa
+    jobid: 77
+    reason: Forced execution
+    wildcards: gene=10262308at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/277199at2759.faa
+    output: output/merged_input/277199at2759.faa
+    jobid: 257
+    reason: Forced execution
+    wildcards: gene=277199at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/190958at2759.faa
+    output: output/merged_input/190958at2759.faa
+    jobid: 170
+    reason: Forced execution
+    wildcards: gene=190958at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/443772at2759.faa
+    output: output/merged_input/443772at2759.faa
+    jobid: 350
+    reason: Forced execution
+    wildcards: gene=443772at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1584384at2759.faa
+    output: output/merged_input/1584384at2759.faa
+    jobid: 125
+    reason: Forced execution
+    wildcards: gene=1584384at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/338231at2759.faa
+    output: output/merged_input/338231at2759.faa
+    jobid: 305
+    reason: Forced execution
+    wildcards: gene=338231at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10252587at2759.faa
+    output: output/merged_input/10252587at2759.faa
+    jobid: 35
+    reason: Forced execution
+    wildcards: gene=10252587at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/24948at2759.faa
+    output: output/merged_input/24948at2759.faa
+    jobid: 215
+    reason: Forced execution
+    wildcards: gene=24948at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10262326at2759.faa
+    output: output/merged_input/10262326at2759.faa
+    jobid: 80
+    reason: Forced execution
+    wildcards: gene=10262326at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/278280at2759.faa
+    output: output/merged_input/278280at2759.faa
+    jobid: 260
+    reason: Forced execution
+    wildcards: gene=278280at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1911237at2759.faa
+    output: output/merged_input/1911237at2759.faa
+    jobid: 173
+    reason: Forced execution
+    wildcards: gene=1911237at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/445326at2759.faa
+    output: output/merged_input/445326at2759.faa
+    jobid: 353
+    reason: Forced execution
+    wildcards: gene=445326at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/163257at2759.faa
+    output: output/merged_input/163257at2759.faa
+    jobid: 128
+    reason: Forced execution
+    wildcards: gene=163257at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/338614at2759.faa
+    output: output/merged_input/338614at2759.faa
+    jobid: 308
+    reason: Forced execution
+    wildcards: gene=338614at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10252687at2759.faa
+    output: output/merged_input/10252687at2759.faa
+    jobid: 38
+    reason: Forced execution
+    wildcards: gene=10252687at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/2516at2759.faa
+    output: output/merged_input/2516at2759.faa
+    jobid: 218
+    reason: Forced execution
+    wildcards: gene=2516at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10263536at2759.faa
+    output: output/merged_input/10263536at2759.faa
+    jobid: 83
+    reason: Forced execution
+    wildcards: gene=10263536at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/283883at2759.faa
+    output: output/merged_input/283883at2759.faa
+    jobid: 263
+    reason: Forced execution
+    wildcards: gene=283883at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1925287at2759.faa
+    output: output/merged_input/1925287at2759.faa
+    jobid: 176
+    reason: Forced execution
+    wildcards: gene=1925287at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/540662at2759.faa
+    output: output/merged_input/540662at2759.faa
+    jobid: 356
+    reason: Forced execution
+    wildcards: gene=540662at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1649088at2759.faa
+    output: output/merged_input/1649088at2759.faa
+    jobid: 131
+    reason: Forced execution
+    wildcards: gene=1649088at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/340500at2759.faa
+    output: output/merged_input/340500at2759.faa
+    jobid: 311
+    reason: Forced execution
+    wildcards: gene=340500at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10252707at2759.faa
+    output: output/merged_input/10252707at2759.faa
+    jobid: 41
+    reason: Forced execution
+    wildcards: gene=10252707at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/25498at2759.faa
+    output: output/merged_input/25498at2759.faa
+    jobid: 221
+    reason: Forced execution
+    wildcards: gene=25498at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10263597at2759.faa
+    output: output/merged_input/10263597at2759.faa
+    jobid: 86
+    reason: Forced execution
+    wildcards: gene=10263597at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/284275at2759.faa
+    output: output/merged_input/284275at2759.faa
+    jobid: 266
+    reason: Forced execution
+    wildcards: gene=284275at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1928at2759.faa
+    output: output/merged_input/1928at2759.faa
+    jobid: 179
+    reason: Forced execution
+    wildcards: gene=1928at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/5414888at2759.faa
+    output: output/merged_input/5414888at2759.faa
+    jobid: 359
+    reason: Forced execution
+    wildcards: gene=5414888at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1650at2759.faa
+    output: output/merged_input/1650at2759.faa
+    jobid: 134
+    reason: Forced execution
+    wildcards: gene=1650at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/344220at2759.faa
+    output: output/merged_input/344220at2759.faa
+    jobid: 314
+    reason: Forced execution
+    wildcards: gene=344220at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10253092at2759.faa
+    output: output/merged_input/10253092at2759.faa
+    jobid: 44
+    reason: Forced execution
+    wildcards: gene=10253092at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/26184at2759.faa
+    output: output/merged_input/26184at2759.faa
+    jobid: 224
+    reason: Forced execution
+    wildcards: gene=26184at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10264038at2759.faa
+    output: output/merged_input/10264038at2759.faa
+    jobid: 89
+    reason: Forced execution
+    wildcards: gene=10264038at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/285729at2759.faa
+    output: output/merged_input/285729at2759.faa
+    jobid: 269
+    reason: Forced execution
+    wildcards: gene=285729at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1933455at2759.faa
+    output: output/merged_input/1933455at2759.faa
+    jobid: 182
+    reason: Forced execution
+    wildcards: gene=1933455at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/5421607at2759.faa
+    output: output/merged_input/5421607at2759.faa
+    jobid: 362
+    reason: Forced execution
+    wildcards: gene=5421607at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1698572at2759.faa
+    output: output/merged_input/1698572at2759.faa
+    jobid: 137
+    reason: Forced execution
+    wildcards: gene=1698572at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/360521at2759.faa
+    output: output/merged_input/360521at2759.faa
+    jobid: 317
+    reason: Forced execution
+    wildcards: gene=360521at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10253098at2759.faa
+    output: output/merged_input/10253098at2759.faa
+    jobid: 47
+    reason: Forced execution
+    wildcards: gene=10253098at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/269405at2759.faa
+    output: output/merged_input/269405at2759.faa
+    jobid: 227
+    reason: Forced execution
+    wildcards: gene=269405at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10264378at2759.faa
+    output: output/merged_input/10264378at2759.faa
+    jobid: 92
+    reason: Forced execution
+    wildcards: gene=10264378at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/2877at2759.faa
+    output: output/merged_input/2877at2759.faa
+    jobid: 272
+    reason: Forced execution
+    wildcards: gene=2877at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10040024at2759.faa
+    output: output/merged_input/10040024at2759.faa
+    jobid: 5
+    reason: Forced execution
+    wildcards: gene=10040024at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1935146at2759.faa
+    output: output/merged_input/1935146at2759.faa
+    jobid: 185
+    reason: Forced execution
+    wildcards: gene=1935146at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1704689at2759.faa
+    output: output/merged_input/1704689at2759.faa
+    jobid: 140
+    reason: Forced execution
+    wildcards: gene=1704689at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/3763at2759.faa
+    output: output/merged_input/3763at2759.faa
+    jobid: 320
+    reason: Forced execution
+    wildcards: gene=3763at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/5571054at2759.faa
+    output: output/merged_input/5571054at2759.faa
+    jobid: 365
+    reason: Forced execution
+    wildcards: gene=5571054at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10254665at2759.faa
+    output: output/merged_input/10254665at2759.faa
+    jobid: 50
+    reason: Forced execution
+    wildcards: gene=10254665at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/26970at2759.faa
+    output: output/merged_input/26970at2759.faa
+    jobid: 230
+    reason: Forced execution
+    wildcards: gene=26970at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10264544at2759.faa
+    output: output/merged_input/10264544at2759.faa
+    jobid: 95
+    reason: Forced execution
+    wildcards: gene=10264544at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/28947at2759.faa
+    output: output/merged_input/28947at2759.faa
+    jobid: 275
+    reason: Forced execution
+    wildcards: gene=28947at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10248812at2759.faa
+    output: output/merged_input/10248812at2759.faa
+    jobid: 8
+    reason: Forced execution
+    wildcards: gene=10248812at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/19740at2759.faa
+    output: output/merged_input/19740at2759.faa
+    jobid: 188
+    reason: Forced execution
+    wildcards: gene=19740at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1715808at2759.faa
+    output: output/merged_input/1715808at2759.faa
+    jobid: 143
+    reason: Forced execution
+    wildcards: gene=1715808at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/391137at2759.faa
+    output: output/merged_input/391137at2759.faa
+    jobid: 323
+    reason: Forced execution
+    wildcards: gene=391137at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/5581181at2759.faa
+    output: output/merged_input/5581181at2759.faa
+    jobid: 368
+    reason: Forced execution
+    wildcards: gene=5581181at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10254730at2759.faa
+    output: output/merged_input/10254730at2759.faa
+    jobid: 53
+    reason: Forced execution
+    wildcards: gene=10254730at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/269919at2759.faa
+    output: output/merged_input/269919at2759.faa
+    jobid: 233
+    reason: Forced execution
+    wildcards: gene=269919at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10264728at2759.faa
+    output: output/merged_input/10264728at2759.faa
+    jobid: 98
+    reason: Forced execution
+    wildcards: gene=10264728at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/29058at2759.faa
+    output: output/merged_input/29058at2759.faa
+    jobid: 278
+    reason: Forced execution
+    wildcards: gene=29058at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10249111at2759.faa
+    output: output/merged_input/10249111at2759.faa
+    jobid: 11
+    reason: Forced execution
+    wildcards: gene=10249111at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/2083at2759.faa
+    output: output/merged_input/2083at2759.faa
+    jobid: 191
+    reason: Forced execution
+    wildcards: gene=2083at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/1726137at2759.faa
+    output: output/merged_input/1726137at2759.faa
+    jobid: 146
+    reason: Forced execution
+    wildcards: gene=1726137at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/407922at2759.faa
+    output: output/merged_input/407922at2759.faa
+    jobid: 326
+    reason: Forced execution
+    wildcards: gene=407922at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/6022at2759.faa
+    output: output/merged_input/6022at2759.faa
+    jobid: 371
+    reason: Forced execution
+    wildcards: gene=6022at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10255118at2759.faa
+    output: output/merged_input/10255118at2759.faa
+    jobid: 56
+    reason: Forced execution
+    wildcards: gene=10255118at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/270624at2759.faa
+    output: output/merged_input/270624at2759.faa
+    jobid: 236
+    reason: Forced execution
+    wildcards: gene=270624at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/10264910at2759.faa
+    output: output/merged_input/10264910at2759.faa
+    jobid: 101
+    reason: Forced execution
+    wildcards: gene=10264910at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule merge_gene_fastas:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input/295656at2759.faa
+    output: output/merged_input/295656at2759.faa
+    jobid: 281
+    reason: Forced execution
+    wildcards: gene=295656at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1739576at2759.faa
+    output: output/famsa/1739576at2759.fasta
+    jobid: 148
+    reason: Forced execution
+    wildcards: gene=1739576at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/421002at2759.faa
+    output: output/famsa/421002at2759.fasta
+    jobid: 328
+    reason: Forced execution
+    wildcards: gene=421002at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10249309at2759.faa
+    output: output/famsa/10249309at2759.fasta
+    jobid: 13
+    reason: Forced execution
+    wildcards: gene=10249309at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10265695at2759.faa
+    output: output/famsa/10265695at2759.fasta
+    jobid: 103
+    reason: Forced execution
+    wildcards: gene=10265695at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/296793at2759.faa
+    output: output/famsa/296793at2759.fasta
+    jobid: 283
+    reason: Forced execution
+    wildcards: gene=296793at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/20844at2759.faa
+    output: output/famsa/20844at2759.fasta
+    jobid: 193
+    reason: Forced execution
+    wildcards: gene=20844at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/674963at2759.faa
+    output: output/famsa/674963at2759.fasta
+    jobid: 373
+    reason: Forced execution
+    wildcards: gene=674963at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10256122at2759.faa
+    output: output/famsa/10256122at2759.fasta
+    jobid: 58
+    reason: Forced execution
+    wildcards: gene=10256122at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/272245at2759.faa
+    output: output/famsa/272245at2759.fasta
+    jobid: 238
+    reason: Forced execution
+    wildcards: gene=272245at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10256606at2759.faa
+    output: output/famsa/10256606at2759.fasta
+    jobid: 61
+    reason: Forced execution
+    wildcards: gene=10256606at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1741719at2759.faa
+    output: output/famsa/1741719at2759.fasta
+    jobid: 151
+    reason: Forced execution
+    wildcards: gene=1741719at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10267031at2759.faa
+    output: output/famsa/10267031at2759.fasta
+    jobid: 106
+    reason: Forced execution
+    wildcards: gene=10267031at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/2187159at2759.faa
+    output: output/famsa/2187159at2759.fasta
+    jobid: 196
+    reason: Forced execution
+    wildcards: gene=2187159at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/30179at2759.faa
+    output: output/famsa/30179at2759.fasta
+    jobid: 286
+    reason: Forced execution
+    wildcards: gene=30179at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/422663at2759.faa
+    output: output/famsa/422663at2759.fasta
+    jobid: 331
+    reason: Forced execution
+    wildcards: gene=422663at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/272987at2759.faa
+    output: output/famsa/272987at2759.fasta
+    jobid: 241
+    reason: Forced execution
+    wildcards: gene=272987at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10249667at2759.faa
+    output: output/famsa/10249667at2759.fasta
+    jobid: 16
+    reason: Forced execution
+    wildcards: gene=10249667at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/70224at2759.faa
+    output: output/famsa/70224at2759.fasta
+    jobid: 376
+    reason: Forced execution
+    wildcards: gene=70224at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/17948at2759.faa
+    output: output/famsa/17948at2759.fasta
+    jobid: 154
+    reason: Forced execution
+    wildcards: gene=17948at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/4249at2759.faa
+    output: output/famsa/4249at2759.fasta
+    jobid: 334
+    reason: Forced execution
+    wildcards: gene=4249at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10267436at2759.faa
+    output: output/famsa/10267436at2759.fasta
+    jobid: 109
+    reason: Forced execution
+    wildcards: gene=10267436at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/30343at2759.faa
+    output: output/famsa/30343at2759.fasta
+    jobid: 289
+    reason: Forced execution
+    wildcards: gene=30343at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10250970at2759.faa
+    output: output/famsa/10250970at2759.fasta
+    jobid: 19
+    reason: Forced execution
+    wildcards: gene=10250970at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/2192561at2759.faa
+    output: output/famsa/2192561at2759.fasta
+    jobid: 199
+    reason: Forced execution
+    wildcards: gene=2192561at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/7396459at2759.faa
+    output: output/famsa/7396459at2759.fasta
+    jobid: 379
+    reason: Forced execution
+    wildcards: gene=7396459at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10261062at2759.faa
+    output: output/famsa/10261062at2759.fasta
+    jobid: 64
+    reason: Forced execution
+    wildcards: gene=10261062at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/273340at2759.faa
+    output: output/famsa/273340at2759.fasta
+    jobid: 244
+    reason: Forced execution
+    wildcards: gene=273340at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1847590at2759.faa
+    output: output/famsa/1847590at2759.fasta
+    jobid: 157
+    reason: Forced execution
+    wildcards: gene=1847590at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10261146at2759.faa
+    output: output/famsa/10261146at2759.fasta
+    jobid: 67
+    reason: Forced execution
+    wildcards: gene=10261146at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/124397at2759.faa
+    output: output/famsa/124397at2759.fasta
+    jobid: 112
+    reason: Forced execution
+    wildcards: gene=124397at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/2195431at2759.faa
+    output: output/famsa/2195431at2759.fasta
+    jobid: 202
+    reason: Forced execution
+    wildcards: gene=2195431at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/8110916at2759.faa
+    output: output/famsa/8110916at2759.fasta
+    jobid: 382
+    reason: Forced execution
+    wildcards: gene=8110916at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/274828at2759.faa
+    output: output/famsa/274828at2759.fasta
+    jobid: 247
+    reason: Forced execution
+    wildcards: gene=274828at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/308449at2759.faa
+    output: output/famsa/308449at2759.fasta
+    jobid: 292
+    reason: Forced execution
+    wildcards: gene=308449at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/431825at2759.faa
+    output: output/famsa/431825at2759.fasta
+    jobid: 337
+    reason: Forced execution
+    wildcards: gene=431825at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10251185at2759.faa
+    output: output/famsa/10251185at2759.fasta
+    jobid: 22
+    reason: Forced execution
+    wildcards: gene=10251185at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/18786at2759.faa
+    output: output/famsa/18786at2759.fasta
+    jobid: 160
+    reason: Forced execution
+    wildcards: gene=18786at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/437331at2759.faa
+    output: output/famsa/437331at2759.fasta
+    jobid: 340
+    reason: Forced execution
+    wildcards: gene=437331at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/125856at2759.faa
+    output: output/famsa/125856at2759.fasta
+    jobid: 115
+    reason: Forced execution
+    wildcards: gene=125856at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/311633at2759.faa
+    output: output/famsa/311633at2759.fasta
+    jobid: 295
+    reason: Forced execution
+    wildcards: gene=311633at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10251574at2759.faa
+    output: output/famsa/10251574at2759.fasta
+    jobid: 25
+    reason: Forced execution
+    wildcards: gene=10251574at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/2196187at2759.faa
+    output: output/famsa/2196187at2759.fasta
+    jobid: 205
+    reason: Forced execution
+    wildcards: gene=2196187at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/844at2759.faa
+    output: output/famsa/844at2759.fasta
+    jobid: 385
+    reason: Forced execution
+    wildcards: gene=844at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10261918at2759.faa
+    output: output/famsa/10261918at2759.fasta
+    jobid: 70
+    reason: Forced execution
+    wildcards: gene=10261918at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/27543at2759.faa
+    output: output/famsa/27543at2759.fasta
+    jobid: 250
+    reason: Forced execution
+    wildcards: gene=27543at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10262062at2759.faa
+    output: output/famsa/10262062at2759.fasta
+    jobid: 73
+    reason: Forced execution
+    wildcards: gene=10262062at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1898821at2759.faa
+    output: output/famsa/1898821at2759.fasta
+    jobid: 163
+    reason: Forced execution
+    wildcards: gene=1898821at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/441223at2759.faa
+    output: output/famsa/441223at2759.fasta
+    jobid: 343
+    reason: Forced execution
+    wildcards: gene=441223at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/15082at2759.faa
+    output: output/famsa/15082at2759.fasta
+    jobid: 118
+    reason: Forced execution
+    wildcards: gene=15082at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/3142434at2759.faa
+    output: output/famsa/3142434at2759.fasta
+    jobid: 298
+    reason: Forced execution
+    wildcards: gene=3142434at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10252281at2759.faa
+    output: output/famsa/10252281at2759.fasta
+    jobid: 28
+    reason: Forced execution
+    wildcards: gene=10252281at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/243313at2759.faa
+    output: output/famsa/243313at2759.fasta
+    jobid: 208
+    reason: Forced execution
+    wildcards: gene=243313at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/88at2759.faa
+    output: output/famsa/88at2759.fasta
+    jobid: 388
+    reason: Forced execution
+    wildcards: gene=88at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/277175at2759.faa
+    output: output/famsa/277175at2759.fasta
+    jobid: 253
+    reason: Forced execution
+    wildcards: gene=277175at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/189968at2759.faa
+    output: output/famsa/189968at2759.fasta
+    jobid: 166
+    reason: Forced execution
+    wildcards: gene=189968at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/441771at2759.faa
+    output: output/famsa/441771at2759.fasta
+    jobid: 346
+    reason: Forced execution
+    wildcards: gene=441771at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/15808at2759.faa
+    output: output/famsa/15808at2759.fasta
+    jobid: 121
+    reason: Forced execution
+    wildcards: gene=15808at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/3370at2759.faa
+    output: output/famsa/3370at2759.fasta
+    jobid: 301
+    reason: Forced execution
+    wildcards: gene=3370at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10252405at2759.faa
+    output: output/famsa/10252405at2759.fasta
+    jobid: 31
+    reason: Forced execution
+    wildcards: gene=10252405at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/248751at2759.faa
+    output: output/famsa/248751at2759.fasta
+    jobid: 211
+    reason: Forced execution
+    wildcards: gene=248751at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule summarize_external_eukcc:
+    input: output/external/metadata/external_genomes.tsv
+    output: output/external/metadata/eukcc_summary.tsv
+    jobid: 391
+    reason: Forced execution
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10262308at2759.faa
+    output: output/famsa/10262308at2759.fasta
+    jobid: 76
+    reason: Forced execution
+    wildcards: gene=10262308at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/277199at2759.faa
+    output: output/famsa/277199at2759.fasta
+    jobid: 256
+    reason: Forced execution
+    wildcards: gene=277199at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/190958at2759.faa
+    output: output/famsa/190958at2759.fasta
+    jobid: 169
+    reason: Forced execution
+    wildcards: gene=190958at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/443772at2759.faa
+    output: output/famsa/443772at2759.fasta
+    jobid: 349
+    reason: Forced execution
+    wildcards: gene=443772at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1584384at2759.faa
+    output: output/famsa/1584384at2759.fasta
+    jobid: 124
+    reason: Forced execution
+    wildcards: gene=1584384at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/338231at2759.faa
+    output: output/famsa/338231at2759.fasta
+    jobid: 304
+    reason: Forced execution
+    wildcards: gene=338231at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10252587at2759.faa
+    output: output/famsa/10252587at2759.fasta
+    jobid: 34
+    reason: Forced execution
+    wildcards: gene=10252587at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/24948at2759.faa
+    output: output/famsa/24948at2759.fasta
+    jobid: 214
+    reason: Forced execution
+    wildcards: gene=24948at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10262326at2759.faa
+    output: output/famsa/10262326at2759.fasta
+    jobid: 79
+    reason: Forced execution
+    wildcards: gene=10262326at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/278280at2759.faa
+    output: output/famsa/278280at2759.fasta
+    jobid: 259
+    reason: Forced execution
+    wildcards: gene=278280at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1911237at2759.faa
+    output: output/famsa/1911237at2759.fasta
+    jobid: 172
+    reason: Forced execution
+    wildcards: gene=1911237at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/445326at2759.faa
+    output: output/famsa/445326at2759.fasta
+    jobid: 352
+    reason: Forced execution
+    wildcards: gene=445326at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/163257at2759.faa
+    output: output/famsa/163257at2759.fasta
+    jobid: 127
+    reason: Forced execution
+    wildcards: gene=163257at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/338614at2759.faa
+    output: output/famsa/338614at2759.fasta
+    jobid: 307
+    reason: Forced execution
+    wildcards: gene=338614at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10252687at2759.faa
+    output: output/famsa/10252687at2759.fasta
+    jobid: 37
+    reason: Forced execution
+    wildcards: gene=10252687at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/2516at2759.faa
+    output: output/famsa/2516at2759.fasta
+    jobid: 217
+    reason: Forced execution
+    wildcards: gene=2516at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10263536at2759.faa
+    output: output/famsa/10263536at2759.fasta
+    jobid: 82
+    reason: Forced execution
+    wildcards: gene=10263536at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/283883at2759.faa
+    output: output/famsa/283883at2759.fasta
+    jobid: 262
+    reason: Forced execution
+    wildcards: gene=283883at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1925287at2759.faa
+    output: output/famsa/1925287at2759.fasta
+    jobid: 175
+    reason: Forced execution
+    wildcards: gene=1925287at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/540662at2759.faa
+    output: output/famsa/540662at2759.fasta
+    jobid: 355
+    reason: Forced execution
+    wildcards: gene=540662at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1649088at2759.faa
+    output: output/famsa/1649088at2759.fasta
+    jobid: 130
+    reason: Forced execution
+    wildcards: gene=1649088at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/340500at2759.faa
+    output: output/famsa/340500at2759.fasta
+    jobid: 310
+    reason: Forced execution
+    wildcards: gene=340500at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10252707at2759.faa
+    output: output/famsa/10252707at2759.fasta
+    jobid: 40
+    reason: Forced execution
+    wildcards: gene=10252707at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/25498at2759.faa
+    output: output/famsa/25498at2759.fasta
+    jobid: 220
+    reason: Forced execution
+    wildcards: gene=25498at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10263597at2759.faa
+    output: output/famsa/10263597at2759.fasta
+    jobid: 85
+    reason: Forced execution
+    wildcards: gene=10263597at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/284275at2759.faa
+    output: output/famsa/284275at2759.fasta
+    jobid: 265
+    reason: Forced execution
+    wildcards: gene=284275at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1928at2759.faa
+    output: output/famsa/1928at2759.fasta
+    jobid: 178
+    reason: Forced execution
+    wildcards: gene=1928at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/5414888at2759.faa
+    output: output/famsa/5414888at2759.fasta
+    jobid: 358
+    reason: Forced execution
+    wildcards: gene=5414888at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1650at2759.faa
+    output: output/famsa/1650at2759.fasta
+    jobid: 133
+    reason: Forced execution
+    wildcards: gene=1650at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/344220at2759.faa
+    output: output/famsa/344220at2759.fasta
+    jobid: 313
+    reason: Forced execution
+    wildcards: gene=344220at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10253092at2759.faa
+    output: output/famsa/10253092at2759.fasta
+    jobid: 43
+    reason: Forced execution
+    wildcards: gene=10253092at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/26184at2759.faa
+    output: output/famsa/26184at2759.fasta
+    jobid: 223
+    reason: Forced execution
+    wildcards: gene=26184at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10264038at2759.faa
+    output: output/famsa/10264038at2759.fasta
+    jobid: 88
+    reason: Forced execution
+    wildcards: gene=10264038at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/285729at2759.faa
+    output: output/famsa/285729at2759.fasta
+    jobid: 268
+    reason: Forced execution
+    wildcards: gene=285729at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1933455at2759.faa
+    output: output/famsa/1933455at2759.fasta
+    jobid: 181
+    reason: Forced execution
+    wildcards: gene=1933455at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/5421607at2759.faa
+    output: output/famsa/5421607at2759.fasta
+    jobid: 361
+    reason: Forced execution
+    wildcards: gene=5421607at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1698572at2759.faa
+    output: output/famsa/1698572at2759.fasta
+    jobid: 136
+    reason: Forced execution
+    wildcards: gene=1698572at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/360521at2759.faa
+    output: output/famsa/360521at2759.fasta
+    jobid: 316
+    reason: Forced execution
+    wildcards: gene=360521at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10253098at2759.faa
+    output: output/famsa/10253098at2759.fasta
+    jobid: 46
+    reason: Forced execution
+    wildcards: gene=10253098at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/269405at2759.faa
+    output: output/famsa/269405at2759.fasta
+    jobid: 226
+    reason: Forced execution
+    wildcards: gene=269405at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10264378at2759.faa
+    output: output/famsa/10264378at2759.fasta
+    jobid: 91
+    reason: Forced execution
+    wildcards: gene=10264378at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/2877at2759.faa
+    output: output/famsa/2877at2759.fasta
+    jobid: 271
+    reason: Forced execution
+    wildcards: gene=2877at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10040024at2759.faa
+    output: output/famsa/10040024at2759.fasta
+    jobid: 4
+    reason: Forced execution
+    wildcards: gene=10040024at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1935146at2759.faa
+    output: output/famsa/1935146at2759.fasta
+    jobid: 184
+    reason: Forced execution
+    wildcards: gene=1935146at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1704689at2759.faa
+    output: output/famsa/1704689at2759.fasta
+    jobid: 139
+    reason: Forced execution
+    wildcards: gene=1704689at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/3763at2759.faa
+    output: output/famsa/3763at2759.fasta
+    jobid: 319
+    reason: Forced execution
+    wildcards: gene=3763at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/5571054at2759.faa
+    output: output/famsa/5571054at2759.fasta
+    jobid: 364
+    reason: Forced execution
+    wildcards: gene=5571054at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10254665at2759.faa
+    output: output/famsa/10254665at2759.fasta
+    jobid: 49
+    reason: Forced execution
+    wildcards: gene=10254665at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/26970at2759.faa
+    output: output/famsa/26970at2759.fasta
+    jobid: 229
+    reason: Forced execution
+    wildcards: gene=26970at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10264544at2759.faa
+    output: output/famsa/10264544at2759.fasta
+    jobid: 94
+    reason: Forced execution
+    wildcards: gene=10264544at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/28947at2759.faa
+    output: output/famsa/28947at2759.fasta
+    jobid: 274
+    reason: Forced execution
+    wildcards: gene=28947at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10248812at2759.faa
+    output: output/famsa/10248812at2759.fasta
+    jobid: 7
+    reason: Forced execution
+    wildcards: gene=10248812at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/19740at2759.faa
+    output: output/famsa/19740at2759.fasta
+    jobid: 187
+    reason: Forced execution
+    wildcards: gene=19740at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1715808at2759.faa
+    output: output/famsa/1715808at2759.fasta
+    jobid: 142
+    reason: Forced execution
+    wildcards: gene=1715808at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/391137at2759.faa
+    output: output/famsa/391137at2759.fasta
+    jobid: 322
+    reason: Forced execution
+    wildcards: gene=391137at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/5581181at2759.faa
+    output: output/famsa/5581181at2759.fasta
+    jobid: 367
+    reason: Forced execution
+    wildcards: gene=5581181at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10254730at2759.faa
+    output: output/famsa/10254730at2759.fasta
+    jobid: 52
+    reason: Forced execution
+    wildcards: gene=10254730at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/269919at2759.faa
+    output: output/famsa/269919at2759.fasta
+    jobid: 232
+    reason: Forced execution
+    wildcards: gene=269919at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10264728at2759.faa
+    output: output/famsa/10264728at2759.fasta
+    jobid: 97
+    reason: Forced execution
+    wildcards: gene=10264728at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/29058at2759.faa
+    output: output/famsa/29058at2759.fasta
+    jobid: 277
+    reason: Forced execution
+    wildcards: gene=29058at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10249111at2759.faa
+    output: output/famsa/10249111at2759.fasta
+    jobid: 10
+    reason: Forced execution
+    wildcards: gene=10249111at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/2083at2759.faa
+    output: output/famsa/2083at2759.fasta
+    jobid: 190
+    reason: Forced execution
+    wildcards: gene=2083at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/1726137at2759.faa
+    output: output/famsa/1726137at2759.fasta
+    jobid: 145
+    reason: Forced execution
+    wildcards: gene=1726137at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/407922at2759.faa
+    output: output/famsa/407922at2759.fasta
+    jobid: 325
+    reason: Forced execution
+    wildcards: gene=407922at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/6022at2759.faa
+    output: output/famsa/6022at2759.fasta
+    jobid: 370
+    reason: Forced execution
+    wildcards: gene=6022at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10255118at2759.faa
+    output: output/famsa/10255118at2759.fasta
+    jobid: 55
+    reason: Forced execution
+    wildcards: gene=10255118at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/270624at2759.faa
+    output: output/famsa/270624at2759.fasta
+    jobid: 235
+    reason: Forced execution
+    wildcards: gene=270624at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/10264910at2759.faa
+    output: output/famsa/10264910at2759.fasta
+    jobid: 100
+    reason: Forced execution
+    wildcards: gene=10264910at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule famsa:
+    input: output/merged_input/295656at2759.faa
+    output: output/famsa/295656at2759.fasta
+    jobid: 280
+    reason: Forced execution
+    wildcards: gene=295656at2759
+    threads: 2
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/3763at2759.fasta
+    output: output/bmge/3763at2759_bmge.fasta
+    jobid: 318
+    reason: Forced execution
+    wildcards: gene=3763at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1704689at2759.fasta
+    output: output/bmge/1704689at2759_bmge.fasta
+    jobid: 138
+    reason: Forced execution
+    wildcards: gene=1704689at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/26970at2759.fasta
+    output: output/bmge/26970at2759_bmge.fasta
+    jobid: 228
+    reason: Forced execution
+    wildcards: gene=26970at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10254665at2759.fasta
+    output: output/bmge/10254665at2759_bmge.fasta
+    jobid: 48
+    reason: Forced execution
+    wildcards: gene=10254665at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1715808at2759.fasta
+    output: output/bmge/1715808at2759_bmge.fasta
+    jobid: 141
+    reason: Forced execution
+    wildcards: gene=1715808at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/391137at2759.fasta
+    output: output/bmge/391137at2759_bmge.fasta
+    jobid: 321
+    reason: Forced execution
+    wildcards: gene=391137at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10254730at2759.fasta
+    output: output/bmge/10254730at2759_bmge.fasta
+    jobid: 51
+    reason: Forced execution
+    wildcards: gene=10254730at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/269919at2759.fasta
+    output: output/bmge/269919at2759_bmge.fasta
+    jobid: 231
+    reason: Forced execution
+    wildcards: gene=269919at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1726137at2759.fasta
+    output: output/bmge/1726137at2759_bmge.fasta
+    jobid: 144
+    reason: Forced execution
+    wildcards: gene=1726137at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/407922at2759.fasta
+    output: output/bmge/407922at2759_bmge.fasta
+    jobid: 324
+    reason: Forced execution
+    wildcards: gene=407922at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10255118at2759.fasta
+    output: output/bmge/10255118at2759_bmge.fasta
+    jobid: 54
+    reason: Forced execution
+    wildcards: gene=10255118at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/270624at2759.fasta
+    output: output/bmge/270624at2759_bmge.fasta
+    jobid: 234
+    reason: Forced execution
+    wildcards: gene=270624at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/421002at2759.fasta
+    output: output/bmge/421002at2759_bmge.fasta
+    jobid: 327
+    reason: Forced execution
+    wildcards: gene=421002at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1739576at2759.fasta
+    output: output/bmge/1739576at2759_bmge.fasta
+    jobid: 147
+    reason: Forced execution
+    wildcards: gene=1739576at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10256122at2759.fasta
+    output: output/bmge/10256122at2759_bmge.fasta
+    jobid: 57
+    reason: Forced execution
+    wildcards: gene=10256122at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/272245at2759.fasta
+    output: output/bmge/272245at2759_bmge.fasta
+    jobid: 237
+    reason: Forced execution
+    wildcards: gene=272245at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1741719at2759.fasta
+    output: output/bmge/1741719at2759_bmge.fasta
+    jobid: 150
+    reason: Forced execution
+    wildcards: gene=1741719at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/422663at2759.fasta
+    output: output/bmge/422663at2759_bmge.fasta
+    jobid: 330
+    reason: Forced execution
+    wildcards: gene=422663at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10256606at2759.fasta
+    output: output/bmge/10256606at2759_bmge.fasta
+    jobid: 60
+    reason: Forced execution
+    wildcards: gene=10256606at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/272987at2759.fasta
+    output: output/bmge/272987at2759_bmge.fasta
+    jobid: 240
+    reason: Forced execution
+    wildcards: gene=272987at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/17948at2759.fasta
+    output: output/bmge/17948at2759_bmge.fasta
+    jobid: 153
+    reason: Forced execution
+    wildcards: gene=17948at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/4249at2759.fasta
+    output: output/bmge/4249at2759_bmge.fasta
+    jobid: 333
+    reason: Forced execution
+    wildcards: gene=4249at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10261062at2759.fasta
+    output: output/bmge/10261062at2759_bmge.fasta
+    jobid: 63
+    reason: Forced execution
+    wildcards: gene=10261062at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/273340at2759.fasta
+    output: output/bmge/273340at2759_bmge.fasta
+    jobid: 243
+    reason: Forced execution
+    wildcards: gene=273340at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1847590at2759.fasta
+    output: output/bmge/1847590at2759_bmge.fasta
+    jobid: 156
+    reason: Forced execution
+    wildcards: gene=1847590at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/431825at2759.fasta
+    output: output/bmge/431825at2759_bmge.fasta
+    jobid: 336
+    reason: Forced execution
+    wildcards: gene=431825at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10261146at2759.fasta
+    output: output/bmge/10261146at2759_bmge.fasta
+    jobid: 66
+    reason: Forced execution
+    wildcards: gene=10261146at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/274828at2759.fasta
+    output: output/bmge/274828at2759_bmge.fasta
+    jobid: 246
+    reason: Forced execution
+    wildcards: gene=274828at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/18786at2759.fasta
+    output: output/bmge/18786at2759_bmge.fasta
+    jobid: 159
+    reason: Forced execution
+    wildcards: gene=18786at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/437331at2759.fasta
+    output: output/bmge/437331at2759_bmge.fasta
+    jobid: 339
+    reason: Forced execution
+    wildcards: gene=437331at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10261918at2759.fasta
+    output: output/bmge/10261918at2759_bmge.fasta
+    jobid: 69
+    reason: Forced execution
+    wildcards: gene=10261918at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/27543at2759.fasta
+    output: output/bmge/27543at2759_bmge.fasta
+    jobid: 249
+    reason: Forced execution
+    wildcards: gene=27543at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1898821at2759.fasta
+    output: output/bmge/1898821at2759_bmge.fasta
+    jobid: 162
+    reason: Forced execution
+    wildcards: gene=1898821at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/441223at2759.fasta
+    output: output/bmge/441223at2759_bmge.fasta
+    jobid: 342
+    reason: Forced execution
+    wildcards: gene=441223at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10262062at2759.fasta
+    output: output/bmge/10262062at2759_bmge.fasta
+    jobid: 72
+    reason: Forced execution
+    wildcards: gene=10262062at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/277175at2759.fasta
+    output: output/bmge/277175at2759_bmge.fasta
+    jobid: 252
+    reason: Forced execution
+    wildcards: gene=277175at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/189968at2759.fasta
+    output: output/bmge/189968at2759_bmge.fasta
+    jobid: 165
+    reason: Forced execution
+    wildcards: gene=189968at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/441771at2759.fasta
+    output: output/bmge/441771at2759_bmge.fasta
+    jobid: 345
+    reason: Forced execution
+    wildcards: gene=441771at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10262308at2759.fasta
+    output: output/bmge/10262308at2759_bmge.fasta
+    jobid: 75
+    reason: Forced execution
+    wildcards: gene=10262308at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/277199at2759.fasta
+    output: output/bmge/277199at2759_bmge.fasta
+    jobid: 255
+    reason: Forced execution
+    wildcards: gene=277199at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/190958at2759.fasta
+    output: output/bmge/190958at2759_bmge.fasta
+    jobid: 168
+    reason: Forced execution
+    wildcards: gene=190958at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/443772at2759.fasta
+    output: output/bmge/443772at2759_bmge.fasta
+    jobid: 348
+    reason: Forced execution
+    wildcards: gene=443772at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10262326at2759.fasta
+    output: output/bmge/10262326at2759_bmge.fasta
+    jobid: 78
+    reason: Forced execution
+    wildcards: gene=10262326at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/278280at2759.fasta
+    output: output/bmge/278280at2759_bmge.fasta
+    jobid: 258
+    reason: Forced execution
+    wildcards: gene=278280at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1911237at2759.fasta
+    output: output/bmge/1911237at2759_bmge.fasta
+    jobid: 171
+    reason: Forced execution
+    wildcards: gene=1911237at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/445326at2759.fasta
+    output: output/bmge/445326at2759_bmge.fasta
+    jobid: 351
+    reason: Forced execution
+    wildcards: gene=445326at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10263536at2759.fasta
+    output: output/bmge/10263536at2759_bmge.fasta
+    jobid: 81
+    reason: Forced execution
+    wildcards: gene=10263536at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/283883at2759.fasta
+    output: output/bmge/283883at2759_bmge.fasta
+    jobid: 261
+    reason: Forced execution
+    wildcards: gene=283883at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1925287at2759.fasta
+    output: output/bmge/1925287at2759_bmge.fasta
+    jobid: 174
+    reason: Forced execution
+    wildcards: gene=1925287at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/540662at2759.fasta
+    output: output/bmge/540662at2759_bmge.fasta
+    jobid: 354
+    reason: Forced execution
+    wildcards: gene=540662at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10263597at2759.fasta
+    output: output/bmge/10263597at2759_bmge.fasta
+    jobid: 84
+    reason: Forced execution
+    wildcards: gene=10263597at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/284275at2759.fasta
+    output: output/bmge/284275at2759_bmge.fasta
+    jobid: 264
+    reason: Forced execution
+    wildcards: gene=284275at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule generate_metadata:
+    input: /home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/metadata/taxonomy_mapping.tsv, output/external/metadata/eukcc_summary.tsv
+    output: output/tree/tree_metadata.tsv
+    jobid: 390
+    reason: Forced execution
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1928at2759.fasta
+    output: output/bmge/1928at2759_bmge.fasta
+    jobid: 177
+    reason: Forced execution
+    wildcards: gene=1928at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/5414888at2759.fasta
+    output: output/bmge/5414888at2759_bmge.fasta
+    jobid: 357
+    reason: Forced execution
+    wildcards: gene=5414888at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10264038at2759.fasta
+    output: output/bmge/10264038at2759_bmge.fasta
+    jobid: 87
+    reason: Forced execution
+    wildcards: gene=10264038at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/285729at2759.fasta
+    output: output/bmge/285729at2759_bmge.fasta
+    jobid: 267
+    reason: Forced execution
+    wildcards: gene=285729at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1933455at2759.fasta
+    output: output/bmge/1933455at2759_bmge.fasta
+    jobid: 180
+    reason: Forced execution
+    wildcards: gene=1933455at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/5421607at2759.fasta
+    output: output/bmge/5421607at2759_bmge.fasta
+    jobid: 360
+    reason: Forced execution
+    wildcards: gene=5421607at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10264378at2759.fasta
+    output: output/bmge/10264378at2759_bmge.fasta
+    jobid: 90
+    reason: Forced execution
+    wildcards: gene=10264378at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/2877at2759.fasta
+    output: output/bmge/2877at2759_bmge.fasta
+    jobid: 270
+    reason: Forced execution
+    wildcards: gene=2877at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10040024at2759.fasta
+    output: output/bmge/10040024at2759_bmge.fasta
+    jobid: 3
+    reason: Forced execution
+    wildcards: gene=10040024at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1935146at2759.fasta
+    output: output/bmge/1935146at2759_bmge.fasta
+    jobid: 183
+    reason: Forced execution
+    wildcards: gene=1935146at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/5571054at2759.fasta
+    output: output/bmge/5571054at2759_bmge.fasta
+    jobid: 363
+    reason: Forced execution
+    wildcards: gene=5571054at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10264544at2759.fasta
+    output: output/bmge/10264544at2759_bmge.fasta
+    jobid: 93
+    reason: Forced execution
+    wildcards: gene=10264544at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/28947at2759.fasta
+    output: output/bmge/28947at2759_bmge.fasta
+    jobid: 273
+    reason: Forced execution
+    wildcards: gene=28947at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10248812at2759.fasta
+    output: output/bmge/10248812at2759_bmge.fasta
+    jobid: 6
+    reason: Forced execution
+    wildcards: gene=10248812at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/19740at2759.fasta
+    output: output/bmge/19740at2759_bmge.fasta
+    jobid: 186
+    reason: Forced execution
+    wildcards: gene=19740at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/5581181at2759.fasta
+    output: output/bmge/5581181at2759_bmge.fasta
+    jobid: 366
+    reason: Forced execution
+    wildcards: gene=5581181at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10264728at2759.fasta
+    output: output/bmge/10264728at2759_bmge.fasta
+    jobid: 96
+    reason: Forced execution
+    wildcards: gene=10264728at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/29058at2759.fasta
+    output: output/bmge/29058at2759_bmge.fasta
+    jobid: 276
+    reason: Forced execution
+    wildcards: gene=29058at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10249111at2759.fasta
+    output: output/bmge/10249111at2759_bmge.fasta
+    jobid: 9
+    reason: Forced execution
+    wildcards: gene=10249111at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/2083at2759.fasta
+    output: output/bmge/2083at2759_bmge.fasta
+    jobid: 189
+    reason: Forced execution
+    wildcards: gene=2083at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/6022at2759.fasta
+    output: output/bmge/6022at2759_bmge.fasta
+    jobid: 369
+    reason: Forced execution
+    wildcards: gene=6022at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10264910at2759.fasta
+    output: output/bmge/10264910at2759_bmge.fasta
+    jobid: 99
+    reason: Forced execution
+    wildcards: gene=10264910at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/295656at2759.fasta
+    output: output/bmge/295656at2759_bmge.fasta
+    jobid: 279
+    reason: Forced execution
+    wildcards: gene=295656at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10249309at2759.fasta
+    output: output/bmge/10249309at2759_bmge.fasta
+    jobid: 12
+    reason: Forced execution
+    wildcards: gene=10249309at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/20844at2759.fasta
+    output: output/bmge/20844at2759_bmge.fasta
+    jobid: 192
+    reason: Forced execution
+    wildcards: gene=20844at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/296793at2759.fasta
+    output: output/bmge/296793at2759_bmge.fasta
+    jobid: 282
+    reason: Forced execution
+    wildcards: gene=296793at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/674963at2759.fasta
+    output: output/bmge/674963at2759_bmge.fasta
+    jobid: 372
+    reason: Forced execution
+    wildcards: gene=674963at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10265695at2759.fasta
+    output: output/bmge/10265695at2759_bmge.fasta
+    jobid: 102
+    reason: Forced execution
+    wildcards: gene=10265695at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/2187159at2759.fasta
+    output: output/bmge/2187159at2759_bmge.fasta
+    jobid: 195
+    reason: Forced execution
+    wildcards: gene=2187159at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10249667at2759.fasta
+    output: output/bmge/10249667at2759_bmge.fasta
+    jobid: 15
+    reason: Forced execution
+    wildcards: gene=10249667at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10267031at2759.fasta
+    output: output/bmge/10267031at2759_bmge.fasta
+    jobid: 105
+    reason: Forced execution
+    wildcards: gene=10267031at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/30179at2759.fasta
+    output: output/bmge/30179at2759_bmge.fasta
+    jobid: 285
+    reason: Forced execution
+    wildcards: gene=30179at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/70224at2759.fasta
+    output: output/bmge/70224at2759_bmge.fasta
+    jobid: 375
+    reason: Forced execution
+    wildcards: gene=70224at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10250970at2759.fasta
+    output: output/bmge/10250970at2759_bmge.fasta
+    jobid: 18
+    reason: Forced execution
+    wildcards: gene=10250970at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/2192561at2759.fasta
+    output: output/bmge/2192561at2759_bmge.fasta
+    jobid: 198
+    reason: Forced execution
+    wildcards: gene=2192561at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10267436at2759.fasta
+    output: output/bmge/10267436at2759_bmge.fasta
+    jobid: 108
+    reason: Forced execution
+    wildcards: gene=10267436at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/30343at2759.fasta
+    output: output/bmge/30343at2759_bmge.fasta
+    jobid: 288
+    reason: Forced execution
+    wildcards: gene=30343at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/7396459at2759.fasta
+    output: output/bmge/7396459at2759_bmge.fasta
+    jobid: 378
+    reason: Forced execution
+    wildcards: gene=7396459at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/2195431at2759.fasta
+    output: output/bmge/2195431at2759_bmge.fasta
+    jobid: 201
+    reason: Forced execution
+    wildcards: gene=2195431at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/8110916at2759.fasta
+    output: output/bmge/8110916at2759_bmge.fasta
+    jobid: 381
+    reason: Forced execution
+    wildcards: gene=8110916at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/124397at2759.fasta
+    output: output/bmge/124397at2759_bmge.fasta
+    jobid: 111
+    reason: Forced execution
+    wildcards: gene=124397at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/308449at2759.fasta
+    output: output/bmge/308449at2759_bmge.fasta
+    jobid: 291
+    reason: Forced execution
+    wildcards: gene=308449at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10251185at2759.fasta
+    output: output/bmge/10251185at2759_bmge.fasta
+    jobid: 21
+    reason: Forced execution
+    wildcards: gene=10251185at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/844at2759.fasta
+    output: output/bmge/844at2759_bmge.fasta
+    jobid: 384
+    reason: Forced execution
+    wildcards: gene=844at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/2196187at2759.fasta
+    output: output/bmge/2196187at2759_bmge.fasta
+    jobid: 204
+    reason: Forced execution
+    wildcards: gene=2196187at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/311633at2759.fasta
+    output: output/bmge/311633at2759_bmge.fasta
+    jobid: 294
+    reason: Forced execution
+    wildcards: gene=311633at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10251574at2759.fasta
+    output: output/bmge/10251574at2759_bmge.fasta
+    jobid: 24
+    reason: Forced execution
+    wildcards: gene=10251574at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/125856at2759.fasta
+    output: output/bmge/125856at2759_bmge.fasta
+    jobid: 114
+    reason: Forced execution
+    wildcards: gene=125856at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10252281at2759.fasta
+    output: output/bmge/10252281at2759_bmge.fasta
+    jobid: 27
+    reason: Forced execution
+    wildcards: gene=10252281at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/243313at2759.fasta
+    output: output/bmge/243313at2759_bmge.fasta
+    jobid: 207
+    reason: Forced execution
+    wildcards: gene=243313at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/15082at2759.fasta
+    output: output/bmge/15082at2759_bmge.fasta
+    jobid: 117
+    reason: Forced execution
+    wildcards: gene=15082at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/3142434at2759.fasta
+    output: output/bmge/3142434at2759_bmge.fasta
+    jobid: 297
+    reason: Forced execution
+    wildcards: gene=3142434at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/88at2759.fasta
+    output: output/bmge/88at2759_bmge.fasta
+    jobid: 387
+    reason: Forced execution
+    wildcards: gene=88at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10252405at2759.fasta
+    output: output/bmge/10252405at2759_bmge.fasta
+    jobid: 30
+    reason: Forced execution
+    wildcards: gene=10252405at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/248751at2759.fasta
+    output: output/bmge/248751at2759_bmge.fasta
+    jobid: 210
+    reason: Forced execution
+    wildcards: gene=248751at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/15808at2759.fasta
+    output: output/bmge/15808at2759_bmge.fasta
+    jobid: 120
+    reason: Forced execution
+    wildcards: gene=15808at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/3370at2759.fasta
+    output: output/bmge/3370at2759_bmge.fasta
+    jobid: 300
+    reason: Forced execution
+    wildcards: gene=3370at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10252587at2759.fasta
+    output: output/bmge/10252587at2759_bmge.fasta
+    jobid: 33
+    reason: Forced execution
+    wildcards: gene=10252587at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/24948at2759.fasta
+    output: output/bmge/24948at2759_bmge.fasta
+    jobid: 213
+    reason: Forced execution
+    wildcards: gene=24948at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1584384at2759.fasta
+    output: output/bmge/1584384at2759_bmge.fasta
+    jobid: 123
+    reason: Forced execution
+    wildcards: gene=1584384at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/338231at2759.fasta
+    output: output/bmge/338231at2759_bmge.fasta
+    jobid: 303
+    reason: Forced execution
+    wildcards: gene=338231at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10252687at2759.fasta
+    output: output/bmge/10252687at2759_bmge.fasta
+    jobid: 36
+    reason: Forced execution
+    wildcards: gene=10252687at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/2516at2759.fasta
+    output: output/bmge/2516at2759_bmge.fasta
+    jobid: 216
+    reason: Forced execution
+    wildcards: gene=2516at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/163257at2759.fasta
+    output: output/bmge/163257at2759_bmge.fasta
+    jobid: 126
+    reason: Forced execution
+    wildcards: gene=163257at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/338614at2759.fasta
+    output: output/bmge/338614at2759_bmge.fasta
+    jobid: 306
+    reason: Forced execution
+    wildcards: gene=338614at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10252707at2759.fasta
+    output: output/bmge/10252707at2759_bmge.fasta
+    jobid: 39
+    reason: Forced execution
+    wildcards: gene=10252707at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/25498at2759.fasta
+    output: output/bmge/25498at2759_bmge.fasta
+    jobid: 219
+    reason: Forced execution
+    wildcards: gene=25498at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1649088at2759.fasta
+    output: output/bmge/1649088at2759_bmge.fasta
+    jobid: 129
+    reason: Forced execution
+    wildcards: gene=1649088at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/340500at2759.fasta
+    output: output/bmge/340500at2759_bmge.fasta
+    jobid: 309
+    reason: Forced execution
+    wildcards: gene=340500at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10253092at2759.fasta
+    output: output/bmge/10253092at2759_bmge.fasta
+    jobid: 42
+    reason: Forced execution
+    wildcards: gene=10253092at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/26184at2759.fasta
+    output: output/bmge/26184at2759_bmge.fasta
+    jobid: 222
+    reason: Forced execution
+    wildcards: gene=26184at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1650at2759.fasta
+    output: output/bmge/1650at2759_bmge.fasta
+    jobid: 132
+    reason: Forced execution
+    wildcards: gene=1650at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/344220at2759.fasta
+    output: output/bmge/344220at2759_bmge.fasta
+    jobid: 312
+    reason: Forced execution
+    wildcards: gene=344220at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/10253098at2759.fasta
+    output: output/bmge/10253098at2759_bmge.fasta
+    jobid: 45
+    reason: Forced execution
+    wildcards: gene=10253098at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/269405at2759.fasta
+    output: output/bmge/269405at2759_bmge.fasta
+    jobid: 225
+    reason: Forced execution
+    wildcards: gene=269405at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/1698572at2759.fasta
+    output: output/bmge/1698572at2759_bmge.fasta
+    jobid: 135
+    reason: Forced execution
+    wildcards: gene=1698572at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule bmge:
+    input: output/famsa/360521at2759.fasta
+    output: output/bmge/360521at2759_bmge.fasta
+    jobid: 315
+    reason: Forced execution
+    wildcards: gene=360521at2759
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule generate_alignment:
+    input: output/bmge/10040024at2759_bmge.fasta, output/bmge/10248812at2759_bmge.fasta, output/bmge/10249111at2759_bmge.fasta, output/bmge/10249309at2759_bmge.fasta, output/bmge/10249667at2759_bmge.fasta, output/bmge/10250970at2759_bmge.fasta, output/bmge/10251185at2759_bmge.fasta, output/bmge/10251574at2759_bmge.fasta, output/bmge/10252281at2759_bmge.fasta, output/bmge/10252405at2759_bmge.fasta, output/bmge/10252587at2759_bmge.fasta, output/bmge/10252687at2759_bmge.fasta, output/bmge/10252707at2759_bmge.fasta, output/bmge/10253092at2759_bmge.fasta, output/bmge/10253098at2759_bmge.fasta, output/bmge/10254665at2759_bmge.fasta, output/bmge/10254730at2759_bmge.fasta, output/bmge/10255118at2759_bmge.fasta, output/bmge/10256122at2759_bmge.fasta, output/bmge/10256606at2759_bmge.fasta, output/bmge/10261062at2759_bmge.fasta, output/bmge/10261146at2759_bmge.fasta, output/bmge/10261918at2759_bmge.fasta, output/bmge/10262062at2759_bmge.fasta, output/bmge/10262308at2759_bmge.fasta, output/bmge/10262326at2759_bmge.fasta, output/bmge/10263536at2759_bmge.fasta, output/bmge/10263597at2759_bmge.fasta, output/bmge/10264038at2759_bmge.fasta, output/bmge/10264378at2759_bmge.fasta, output/bmge/10264544at2759_bmge.fasta, output/bmge/10264728at2759_bmge.fasta, output/bmge/10264910at2759_bmge.fasta, output/bmge/10265695at2759_bmge.fasta, output/bmge/10267031at2759_bmge.fasta, output/bmge/10267436at2759_bmge.fasta, output/bmge/124397at2759_bmge.fasta, output/bmge/125856at2759_bmge.fasta, output/bmge/15082at2759_bmge.fasta, output/bmge/15808at2759_bmge.fasta, output/bmge/1584384at2759_bmge.fasta, output/bmge/163257at2759_bmge.fasta, output/bmge/1649088at2759_bmge.fasta, output/bmge/1650at2759_bmge.fasta, output/bmge/1698572at2759_bmge.fasta, output/bmge/1704689at2759_bmge.fasta, output/bmge/1715808at2759_bmge.fasta, output/bmge/1726137at2759_bmge.fasta, output/bmge/1739576at2759_bmge.fasta, output/bmge/1741719at2759_bmge.fasta, output/bmge/17948at2759_bmge.fasta, output/bmge/1847590at2759_bmge.fasta, output/bmge/18786at2759_bmge.fasta, output/bmge/1898821at2759_bmge.fasta, output/bmge/189968at2759_bmge.fasta, output/bmge/190958at2759_bmge.fasta, output/bmge/1911237at2759_bmge.fasta, output/bmge/1925287at2759_bmge.fasta, output/bmge/1928at2759_bmge.fasta, output/bmge/1933455at2759_bmge.fasta, output/bmge/1935146at2759_bmge.fasta, output/bmge/19740at2759_bmge.fasta, output/bmge/2083at2759_bmge.fasta, output/bmge/20844at2759_bmge.fasta, output/bmge/2187159at2759_bmge.fasta, output/bmge/2192561at2759_bmge.fasta, output/bmge/2195431at2759_bmge.fasta, output/bmge/2196187at2759_bmge.fasta, output/bmge/243313at2759_bmge.fasta, output/bmge/248751at2759_bmge.fasta, output/bmge/24948at2759_bmge.fasta, output/bmge/2516at2759_bmge.fasta, output/bmge/25498at2759_bmge.fasta, output/bmge/26184at2759_bmge.fasta, output/bmge/269405at2759_bmge.fasta, output/bmge/26970at2759_bmge.fasta, output/bmge/269919at2759_bmge.fasta, output/bmge/270624at2759_bmge.fasta, output/bmge/272245at2759_bmge.fasta, output/bmge/272987at2759_bmge.fasta, output/bmge/273340at2759_bmge.fasta, output/bmge/274828at2759_bmge.fasta, output/bmge/27543at2759_bmge.fasta, output/bmge/277175at2759_bmge.fasta, output/bmge/277199at2759_bmge.fasta, output/bmge/278280at2759_bmge.fasta, output/bmge/283883at2759_bmge.fasta, output/bmge/284275at2759_bmge.fasta, output/bmge/285729at2759_bmge.fasta, output/bmge/2877at2759_bmge.fasta, output/bmge/28947at2759_bmge.fasta, output/bmge/29058at2759_bmge.fasta, output/bmge/295656at2759_bmge.fasta, output/bmge/296793at2759_bmge.fasta, output/bmge/30179at2759_bmge.fasta, output/bmge/30343at2759_bmge.fasta, output/bmge/308449at2759_bmge.fasta, output/bmge/311633at2759_bmge.fasta, output/bmge/3142434at2759_bmge.fasta, output/bmge/3370at2759_bmge.fasta, output/bmge/338231at2759_bmge.fasta, output/bmge/338614at2759_bmge.fasta, output/bmge/340500at2759_bmge.fasta, output/bmge/344220at2759_bmge.fasta, output/bmge/360521at2759_bmge.fasta, output/bmge/3763at2759_bmge.fasta, output/bmge/391137at2759_bmge.fasta, output/bmge/407922at2759_bmge.fasta, output/bmge/421002at2759_bmge.fasta, output/bmge/422663at2759_bmge.fasta, output/bmge/4249at2759_bmge.fasta, output/bmge/431825at2759_bmge.fasta, output/bmge/437331at2759_bmge.fasta, output/bmge/441223at2759_bmge.fasta, output/bmge/441771at2759_bmge.fasta, output/bmge/443772at2759_bmge.fasta, output/bmge/445326at2759_bmge.fasta, output/bmge/540662at2759_bmge.fasta, output/bmge/5414888at2759_bmge.fasta, output/bmge/5421607at2759_bmge.fasta, output/bmge/5571054at2759_bmge.fasta, output/bmge/5581181at2759_bmge.fasta, output/bmge/6022at2759_bmge.fasta, output/bmge/674963at2759_bmge.fasta, output/bmge/70224at2759_bmge.fasta, output/bmge/7396459at2759_bmge.fasta, output/bmge/8110916at2759_bmge.fasta, output/bmge/844at2759_bmge.fasta, output/bmge/88at2759_bmge.fasta
+    output: output/alignments/concatinated_alignment.fasta
+    jobid: 2
+    reason: Forced execution
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule build_tree:
+    input: output/alignments/concatinated_alignment.fasta
+    output: output/tree/tree.nwk
+    jobid: 1
+    reason: Forced execution
+    resources: tmpdir=/tmp, runtime=120, mem_mb=8000, mem=8 GB, mem_mib=7630
+[Tue Jun  9 17:56:23 2026]
+rule all:
+    input: output/tree/tree.nwk, output/tree/tree_metadata.tsv
+    jobid: 0
+    reason: Forced execution
+    resources: tmpdir=/tmp
+Job stats:
+job                              count
+-----------------------------  -------
+build_external_manifest_table        1
+merge_gene_fastas                  129
+famsa                              129
+summarize_external_eukcc             1
+bmge                               129
+generate_metadata                    1
+generate_alignment                   1
+build_tree                           1
+all                                  1
+total                              393
+
+Reasons:
+    (check individual jobs above for details)
+    forced:
+        all, bmge, build_external_manifest_table, build_tree, famsa, generate_alignment, generate_metadata, merge_gene_fastas, summarize_external_eukcc
+This was a dry-run (flag -n). The order of jobs does not reflect the order of execution.

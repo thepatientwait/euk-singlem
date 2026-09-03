@@ -1,0 +1,11 @@
+[workspace]
+authors = ["thepatientwait <thepatientwait@gmail.com>"]
+channels = ["conda-forge"]
+name = "tree_workflow"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+polars = ">=1.39.3,<2"

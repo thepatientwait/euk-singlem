@@ -1,0 +1,9 @@
+orchestration:
+  dryrun_mode: true
+  extra_args: "--dry-run --quiet rules"
+
+download:
+  done_flag: "outputs/orchestration/dryrun/phase1_download.done"
+
+generate:
+  done_flag: "outputs/orchestration/dryrun/phase2_generate.done"

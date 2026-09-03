@@ -1,0 +1,46 @@
+metapackage:
+  singlem_input_dir: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input"
+  valid_packages_manifest: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/euk_packages/valid_singlem_packages.txt"
+  taxonomy_mapping: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/metadata/taxonomy_mapping.tsv"
+
+external:
+  enabled: false
+  group_name: "external"
+  genome_manifest: "inputs/external_genomes.paths"
+  cluster_table: "/work/microbiome/binchicken/DeepOceanEukaryotes/clusters/genome_clusters_95.tsv"
+  cluster_base_dir: "/work/microbiome/binchicken/DeepOceanEukaryotes"
+  ncbi_taxid_map: "inputs/external_genome_taxids.tsv"
+
+busco:
+  lineage: "eukaryota_odb12"
+  mode: "genome"
+  min_complete_markers: 40
+
+aggregation:
+  min_sequences_per_gene: 1
+
+eukcc:
+  threads: 2
+  mem_mb: 12000
+  command_template: "eukcc single --threads {threads} --out {outdir} {genome}"
+  db: "db/eukcc/eukcc2_db_ver_1.2"
+  db_url: "http://ftp.ebi.ac.uk/pub/databases/metagenomics/eukcc/eukcc2_db_ver_1.2.tar.gz"
+  taxonomy_hint_file: "taxonomy.tsv"
+
+ncbi:
+  email: "mitcheja@qut.edu.au"
+  strict_requery: false
+
+alignment:
+  bmge_h: 0.6
+  bmge_g: 0.6
+  bmge_matrix: "BLOSUM62"
+
+taxonomy:
+  phylorank_command: "phylorank"
+
+resources:
+  base_mem_mb: 8000
+  base_runtime: "2h"
+  total_attempts: 3
+  busco_threads: 8

@@ -1,0 +1,106 @@
+import os
+import shlex
+from pathlib import Path
+
+# config
+# ------
+configfile: "config.yaml"
+configfile: "paths.yaml"
+
+ROOT              = Path(workflow.basedir).resolve()
+SUBWORKFLOWS_DIR  = ROOT / "subworkflows"
+DOWNLOAD_PATHS    = config["download"]
+GENERATE_PATHS    = config["generate"]
+
+DOWNLOAD_SNAKEFILE = SUBWORKFLOWS_DIR / "download_data.smk"
+GENERATE_SNAKEFILE = SUBWORKFLOWS_DIR / "generate_metapackage.smk"
+
+PHASE1_DONE = Path(DOWNLOAD_PATHS["done_flag"])
+PHASE2_DONE = Path(GENERATE_PATHS["done_flag"])
+
+# Create done-flag parent directories once at parse time.
+os.makedirs(PHASE1_DONE.parent, exist_ok=True)
+os.makedirs(PHASE2_DONE.parent, exist_ok=True)
+
+ORCH_CFG         = config.get("orchestration", {})
+PROFILE          = ORCH_CFG.get("profile", "~/git/hpc_scripts/snakemake_configs/aqua")
+USE_CONDA        = bool(ORCH_CFG.get("use_conda", True))
+RERUN_INCOMPLETE = bool(ORCH_CFG.get("rerun_incomplete", True))
+EXTRA_ARGS       = ORCH_CFG.get("extra_args", "")
+DRYRUN_MODE      = bool(ORCH_CFG.get("dryrun_mode", False))
+
+# dryrun
+if DRYRUN_MODE:
+    for done_flag in (PHASE1_DONE, PHASE2_DONE):
+        if done_flag.exists():
+            done_flag.unlink()
+
+# resources
+COMMON_FLAGS = ""
+
+
+def get_workflow_cores():
+    if workflow.cores is None:
+        return 1
+    return int(workflow.cores)
+
+
+def build_common_flags():
+    flags = []
+    if PROFILE:
+        flags.append(f"--profile {shlex.quote(str(Path(PROFILE).expanduser()))}")
+    if USE_CONDA:
+        flags.append("--use-conda")
+    if RERUN_INCOMPLETE:
+        flags.append("--rerun-incomplete")
+    if EXTRA_ARGS:
+        flags.append(EXTRA_ARGS)
+    return " ".join(flags)
+
+
+COMMON_FLAGS = build_common_flags()
+
+localrules:
+    all,
+    run_download_subworkflow,
+    run_generate_subworkflow
+
+
+rule all:
+    input:
+        # PATHS_MANIFEST["genome"],
+        # PATHS_METAPACKAGE["final"],
+        str(PHASE1_DONE),
+        str(PHASE2_DONE)
+
+
+rule run_download_subworkflow:
+    output:
+        done = str(PHASE1_DONE)
+    params:
+        snakefile = str(DOWNLOAD_SNAKEFILE),
+        workdir   = str(ROOT),
+        cores     = get_workflow_cores(),
+        flags     = COMMON_FLAGS
+    shell:
+        """
+        snakemake --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags}
+        touch {output.done}
+        """
+
+
+rule run_generate_subworkflow:
+    input:
+        done = str(PHASE1_DONE)
+    output:
+        done = str(PHASE2_DONE)
+    params:
+        snakefile = str(GENERATE_SNAKEFILE),
+        workdir   = str(ROOT),
+        cores     = get_workflow_cores(),
+        flags     = COMMON_FLAGS
+    shell:
+        """
+        snakemake --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags}
+        touch {output.done}
+        """

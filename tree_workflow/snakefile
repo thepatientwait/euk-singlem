@@ -1,0 +1,534 @@
+from pathlib import Path
+import random
+
+import polars as pl
+
+from helpers import (
+    build_external_busco_targets_factory,
+    build_external_eukcc_done_targets_factory,
+    build_external_gene_path_factory,
+    build_merged_bmge_targets_factory,
+    build_merged_genes_factory,
+    build_merged_taxonomy_input_factory,
+    create_resource_profile_factory,
+    create_dirs,
+    load_external_genome_map,
+    load_valid_genes,
+)
+
+
+ROOT                = Path(workflow.basedir).resolve()
+METAPACKAGE_ROOT    = ROOT.parent / "metapackage_workflow"
+METAPACKAGE_SCRIPTS = METAPACKAGE_ROOT / "scripts"
+TREE_SCRIPTS        = ROOT / "scripts"
+TAXONOMY_ENV        = str(ROOT / "envs" / "taxonomy.yaml")
+CONFIG_PATH         = ROOT / "config.yaml"
+PATHS_CONFIG_PATH   = ROOT / "paths.yaml"
+
+configfile: str(CONFIG_PATH)
+configfile: str(PATHS_CONFIG_PATH)
+
+
+METAPACKAGE_CONFIG = config["metapackage"]
+EXTERNAL_CONFIG    = config["external"]
+BUSCO_CONFIG       = config["busco"]
+AGGREGATION_CONFIG = config["aggregation"]
+EUKCC_CONFIG       = config["eukcc"]
+NCBI_CONFIG        = config["ncbi"]
+ALIGNMENT_CONFIG   = config["alignment"]
+TAXONOMY_CONFIG    = config["taxonomy"]
+RESOURCE_CONFIG    = config["resources"]
+WORKFLOW_PATHS     = config["paths"]
+BASE_MEM_MB        = int(RESOURCE_CONFIG.get("base_mem_mb", 8000))
+BASE_RUNTIME       = str(RESOURCE_CONFIG.get("base_runtime", "1h"))
+TOTAL_ATTEMPTS     = int(RESOURCE_CONFIG.get("total_attempts", 3))
+RESOURCE_PROFILE   = create_resource_profile_factory(BASE_MEM_MB, BASE_RUNTIME, TOTAL_ATTEMPTS)
+DEFAULT_RESOURCES  = RESOURCE_PROFILE()
+BUSCO_RESOURCES    = RESOURCE_PROFILE(busco=True)
+
+EXTERNAL_PATHS = WORKFLOW_PATHS["external"]
+MERGED_PATHS   = WORKFLOW_PATHS["merged"]
+TREE_PATHS     = WORKFLOW_PATHS["tree"]
+TAXONOMY_PATHS = WORKFLOW_PATHS["taxonomy"]
+EUKCC_DB_PATHS = WORKFLOW_PATHS["eukcc_db"]
+BUSCO_DOWNLOAD_PATH = str((ROOT / "busco_downloads").resolve())
+BUSCO_LINEAGE_READY = str((ROOT / "output" / "external" / "metadata" / f".busco_lineage_{BUSCO_CONFIG['lineage']}.ready").resolve())
+
+
+METAPACKAGE_SINGLEM_INPUT_DIR = Path(METAPACKAGE_CONFIG["singlem_input_dir"])
+METAPACKAGE_VALID_PACKAGES    = Path(METAPACKAGE_CONFIG["valid_packages_manifest"])
+METAPACKAGE_TAXONOMY          = Path(METAPACKAGE_CONFIG["taxonomy_mapping"])
+
+EXTERNAL_ENABLED  = bool(EXTERNAL_CONFIG.get("enabled", False))
+EXTERNAL_GROUP    = str(EXTERNAL_CONFIG.get("group_name", "external"))
+EXTERNAL_MANIFEST  = Path(EXTERNAL_CONFIG["genome_manifest"])
+EXTERNAL_TAXID_MAP = Path(EXTERNAL_CONFIG["ncbi_taxid_map"])
+
+_eukcc_db_path = Path(str(EUKCC_CONFIG.get("db", EUKCC_DB_PATHS["extracted_dir"])))
+if not _eukcc_db_path.is_absolute():
+    _eukcc_db_path = (ROOT / _eukcc_db_path).resolve()
+EUKCC_DB_PATH = str(_eukcc_db_path)
+
+create_dirs(WORKFLOW_PATHS, ROOT, substitutions={"group": EXTERNAL_GROUP})
+
+VALID_GENES         = load_valid_genes(METAPACKAGE_VALID_PACKAGES)
+EXTERNAL_GENOME_MAP = load_external_genome_map(
+    external_enabled=EXTERNAL_ENABLED,
+    external_manifest=EXTERNAL_MANIFEST,
+    external_config=EXTERNAL_CONFIG,
+)
+EXTERNAL_ACCESSIONS = sorted(EXTERNAL_GENOME_MAP.keys())
+USE_EXTERNAL        = EXTERNAL_ENABLED and len(EXTERNAL_ACCESSIONS) > 0
+
+EXTERNAL_BUSCO_TARGETS = build_external_busco_targets_factory(
+    external_paths=EXTERNAL_PATHS,
+    external_group=EXTERNAL_GROUP,
+    external_accessions=EXTERNAL_ACCESSIONS,
+    use_external=USE_EXTERNAL,
+)
+EXTERNAL_EUKCC_DONE_TARGETS = build_external_eukcc_done_targets_factory(
+    external_paths=EXTERNAL_PATHS,
+    external_accessions=EXTERNAL_ACCESSIONS,
+    use_external=USE_EXTERNAL,
+)
+EXTERNAL_GENE_PATH    = build_external_gene_path_factory(EXTERNAL_PATHS, checkpoints, USE_EXTERNAL)
+MERGED_GENES          = build_merged_genes_factory(VALID_GENES, checkpoints, USE_EXTERNAL)
+MERGED_BMGE_TARGETS   = build_merged_bmge_targets_factory(TREE_PATHS, MERGED_GENES)
+MERGED_TAXONOMY_INPUT = build_merged_taxonomy_input_factory(EXTERNAL_PATHS, METAPACKAGE_TAXONOMY, USE_EXTERNAL)
+
+
+rule all:
+    input:
+        TREE_PATHS["rerooted_newick"],
+        TAXONOMY_PATHS["metadata"]
+
+
+rule build_external_manifest_table:
+    output:
+        table = EXTERNAL_PATHS["metadata"]["manifest_table"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    run:
+        out_path = Path(output.table)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        rows = []
+        for genome_acc, genome_path in EXTERNAL_GENOME_MAP.items():
+            rows.append({"group": EXTERNAL_GROUP, "genome_acc": genome_acc, "genome_path": genome_path})
+
+        if rows:
+            pl.DataFrame(rows).write_csv(out_path, separator="\t")
+        else:
+            pl.DataFrame(schema={"group": pl.Utf8, "genome_acc": pl.Utf8, "genome_path": pl.Utf8}).write_csv(
+                out_path,
+                separator="\t",
+            )
+
+
+rule init_external_busco_lineage_cache:
+    output:
+        ready_marker = BUSCO_LINEAGE_READY
+    params:
+        lineage = BUSCO_CONFIG["lineage"],
+        download_path = BUSCO_DOWNLOAD_PATH
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    conda:
+        str(ROOT / "envs" / "busco.yaml")
+    shell:
+        """
+        mkdir -p {params.download_path}
+        mkdir -p $(dirname {output.ready_marker})
+        if [ ! -s {params.download_path}/file_versions.tsv ] || [ ! -d {params.download_path}/lineages/{params.lineage} ]; then
+            busco --download {params.lineage} --download_path {params.download_path}
+        fi
+        test -s {params.download_path}/file_versions.tsv
+        test -d {params.download_path}/lineages/{params.lineage}
+        touch {output.ready_marker}
+        """
+
+
+rule run_external_busco:
+    input:
+        genome         = lambda wildcards: EXTERNAL_GENOME_MAP[wildcards.genome_acc],
+        manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
+        lineage_ready  = BUSCO_LINEAGE_READY
+    output:
+        full_table = EXTERNAL_PATHS["busco"]["full_table"]
+    params:
+        lineage      = BUSCO_CONFIG["lineage"],
+        mode         = BUSCO_CONFIG["mode"],
+        out_path_dir = lambda wildcards: EXTERNAL_PATHS["busco"]["outdir"].format(group=wildcards.group),
+        download_path = BUSCO_DOWNLOAD_PATH,
+        offline       = True,
+    threads: int(RESOURCE_CONFIG.get("busco_threads", 8))
+    retries: TOTAL_ATTEMPTS
+    resources: **BUSCO_RESOURCES
+    conda:
+        str(ROOT / "envs" / "busco.yaml")
+    wildcard_constraints:
+        group = EXTERNAL_GROUP
+    script:
+        str(METAPACKAGE_SCRIPTS / "run_busco.py")
+
+
+rule external_busco_results_quality_control:
+    input:
+        busco_results = EXTERNAL_BUSCO_TARGETS
+    output:
+        manifest = EXTERNAL_PATHS["metadata"]["busco_qc"]
+    params:
+        min_complete_markers = int(BUSCO_CONFIG["min_complete_markers"])
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    script:
+        str(METAPACKAGE_SCRIPTS / "busco_results_quality_control.py")
+
+
+rule external_build_checkm2_quality_report:
+    input:
+        busco_manifest = EXTERNAL_PATHS["metadata"]["busco_qc"]
+    output:
+        report = EXTERNAL_PATHS["metadata"]["checkm2"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    script:
+        str(METAPACKAGE_SCRIPTS / "build_checkm2_quality_report.py")
+
+
+rule prepare_eukcc_db:
+    output:
+        archive = EUKCC_DB_PATHS["archive"],
+        extracted_dir = directory(EUKCC_DB_PATHS["extracted_dir"]),
+        ready_marker = EUKCC_DB_PATHS["ready_marker"]
+    params:
+        root_dir = EUKCC_DB_PATHS["root_dir"],
+        db_url = EUKCC_CONFIG["db_url"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    shell:
+        """
+        mkdir -p {params.root_dir}
+        if [ ! -s {output.archive} ]; then
+            wget -O {output.archive} {params.db_url}
+        fi
+        if [ ! -d {output.extracted_dir} ]; then
+            tar -xzvf {output.archive} -C {params.root_dir}
+        fi
+        realpath {output.extracted_dir} > {output.ready_marker}
+        """
+
+
+rule run_external_eukcc:
+    input:
+        genome         = lambda wildcards: EXTERNAL_GENOME_MAP[wildcards.genome_acc],
+        manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
+        db_ready       = EUKCC_DB_PATHS["ready_marker"]
+    output:
+        done = EXTERNAL_PATHS["eukcc"]["per_genome_done"]
+    params:
+        outdir           = lambda wildcards: EXTERNAL_PATHS["eukcc"]["per_genome_dir"].format(genome_acc=wildcards.genome_acc),
+        command_template = lambda wildcards: EUKCC_CONFIG["command_template"],
+        db_path          = EUKCC_DB_PATH
+    threads: int(EUKCC_CONFIG.get("threads", 8))
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    # resources: **RESOURCE_PROFILE(mem_scale=20)  # EukCC can be memory intensive, so we scale up memory for this step
+    conda:
+        str(ROOT / "envs" / "eukcc.yaml")
+    script:
+        str(TREE_SCRIPTS / "run_eukcc.py")
+
+
+rule summarize_external_eukcc:
+    input:
+        external_manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
+        eukcc_done              = EXTERNAL_EUKCC_DONE_TARGETS
+    output:
+        summary = EXTERNAL_PATHS["metadata"]["eukcc_summary"]
+    params:
+        eukcc_dir_pattern = lambda wildcards: EXTERNAL_PATHS["eukcc"]["per_genome_dir"],
+        taxonomy_hint_file = EUKCC_CONFIG.get("taxonomy_hint_file", "taxonomy.tsv")
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    script:
+        str(TREE_SCRIPTS / "summarize_eukcc_results.py")
+
+
+rule rebuild_taxonomy_mapping:
+    input:
+        base_taxonomy           = str(METAPACKAGE_TAXONOMY),
+        external_manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
+        external_taxid_map      = str(EXTERNAL_TAXID_MAP) if EXTERNAL_TAXID_MAP.exists() else [],
+        eukcc_summary           = EXTERNAL_PATHS["metadata"]["eukcc_summary"]
+    output:
+        taxonomy = EXTERNAL_PATHS["metadata"]["ncbi_rebuilt_taxonomy"]
+    params:
+        email                  = NCBI_CONFIG["email"],
+        strict_requery         = bool(NCBI_CONFIG.get("strict_requery", False)),
+        external_taxid_map_path = str(EXTERNAL_TAXID_MAP)
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    script:
+        str(TREE_SCRIPTS / "rebuild_taxonomy_mapping.py")
+
+
+checkpoint aggregate_external_busco_sequences:
+    input:
+        quality_report = EXTERNAL_PATHS["metadata"]["checkm2"],
+        metadata_files = [],
+        busco_manifest = EXTERNAL_PATHS["metadata"]["busco_qc"],
+        taxonomy      = EXTERNAL_PATHS["metadata"]["ncbi_rebuilt_taxonomy"]
+    output:
+        sequences_dir        = directory(EXTERNAL_PATHS["aggregate"]["sequences_dir"]),
+        genome_input_genomes = EXTERNAL_PATHS["aggregate"]["genome_protein_files"],
+        genome_input_hmms    = EXTERNAL_PATHS["aggregate"]["hmms_and_names"]
+    params:
+        min_sequences_per_gene = int(AGGREGATION_CONFIG.get("min_sequences_per_gene", 1))
+    threads: 8
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    script:
+        str(METAPACKAGE_SCRIPTS / "aggregate_busco_sequences.py")
+
+
+
+rule merge_gene_fastas:
+    input:
+        base_faa      = lambda wildcards: str(METAPACKAGE_SINGLEM_INPUT_DIR / f"{wildcards.gene}.faa"),
+        # Use a file output (not the directory output) as the checkpoint dependency.
+        # The sequences_dir can be pre-created during setup, which would otherwise
+        # let Snakemake skip actual aggregation.
+        external_ready = lambda wildcards: checkpoints.aggregate_external_busco_sequences.get().output.genome_input_genomes if USE_EXTERNAL else []
+    output:
+        merged_faa = MERGED_PATHS["gene_faa"]
+    params:
+        external_faa = lambda wildcards: str(EXTERNAL_GENE_PATH(wildcards.gene)),
+        use_external = USE_EXTERNAL
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    script:
+        str(TREE_SCRIPTS / "merge_gene_fastas.py")
+
+
+rule famsa:
+    input:
+        MERGED_PATHS["gene_faa"]
+    output:
+        TREE_PATHS["famsa"]
+    threads: 2
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    shell:
+        """
+        famsa {input} {output}
+        """
+
+
+rule bmge:
+    input:
+        TREE_PATHS["famsa"]
+    output:
+        TREE_PATHS["bmge"]
+    params:
+        h = ALIGNMENT_CONFIG["bmge_h"],
+        g = ALIGNMENT_CONFIG["bmge_g"],
+        matrix = ALIGNMENT_CONFIG["bmge_matrix"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    shell:
+        """
+        bmge -i {input} -of {output} -h {params.h} -g {params.g} -t AA -m {params.matrix}
+        """
+
+
+rule generate_alignment:
+    input:
+        alignment_files = MERGED_BMGE_TARGETS
+    output:
+        concatinated_alignment = TREE_PATHS["alignment"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    run:
+        from Bio import SeqIO
+        from Bio.Seq import Seq
+        from Bio.SeqRecord import SeqRecord
+
+        alignment_files = input.alignment_files
+        if isinstance(alignment_files, (str, Path)):
+            alignment_files = [Path(alignment_files)]
+        else:
+            alignment_files = [Path(path) for path in alignment_files]
+
+        valid_alignment_files = [path for path in alignment_files if path.is_file()]
+        invalid_alignment_files = [path for path in alignment_files if not path.is_file()]
+        if invalid_alignment_files:
+            invalid_text = ", ".join(str(path) for path in invalid_alignment_files)
+            if not valid_alignment_files:
+                raise FileNotFoundError(f"No valid BMGE alignment files were found. Invalid inputs: {invalid_text}")
+            print(f"Skipping invalid BMGE alignment inputs: {invalid_text}")
+
+        species_df = pl.DataFrame(schema={"species_acc": str})
+        gene_length = {}
+
+        for alignment_file in valid_alignment_files:
+            gene_name = alignment_file.name.split("_bmge")[0]
+            species_gene_dict = {}
+            for record in SeqIO.parse(str(alignment_file), "fasta"):
+                species = record.id.split("|")[0]
+                species_gene_dict.setdefault(species, str(record.seq))
+
+            if not species_gene_dict:
+                continue
+
+            gene_index = f"gene_sequence-{gene_name}"
+            gene_length[gene_index] = len(next(iter(species_gene_dict.values())))
+            gene_df = (
+                pl.DataFrame(
+                    {
+                        "species_acc": list(species_gene_dict.keys()),
+                        gene_index: list(species_gene_dict.values()),
+                    }
+                )
+                .join(species_df.select("species_acc"), on="species_acc", how="full", coalesce=True)
+            )
+
+            species_df = species_df.join(gene_df, on="species_acc", how="full", coalesce=True)
+
+        species_df = (
+            species_df.with_columns(
+                [
+                    pl.col(col).fill_null("-" * gene_length.get(col, 0))
+                    for col in species_df.columns
+                    if col.startswith("gene_sequence-")
+                ]
+            )
+            .select(
+                pl.col("species_acc"),
+                pl.concat_str([pl.col("^gene_sequence-\\w+$")]).alias("full_gene_sequence"),
+            )
+        )
+
+        final_seq_list = [
+            SeqRecord(seq=Seq(species["full_gene_sequence"]), id=str(species["species_acc"]), description="")
+            for species in species_df.iter_rows(named=True)
+        ]
+
+        SeqIO.write(final_seq_list, output.concatinated_alignment, "fasta")
+
+
+rule build_tree:
+    input:
+        TREE_PATHS["alignment"]
+    output:
+        TREE_PATHS["newick"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    shell:
+        """
+        fasttree -nt {input} > {output}
+        """
+
+rule reroot_tree:
+    input:
+        tree = TREE_PATHS["newick"]
+    output:
+        rerooted_tree = TREE_PATHS["rerooted_newick"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    conda:
+        TAXONOMY_ENV
+    run:
+        import dendropy
+
+        tree = dendropy.Tree.get(path=input.tree, schema="newick", preserve_underscores=True)
+        tree.reroot_at_midpoint(update_bipartitions=False)
+        tree.write(path=output.rerooted_tree, schema="newick", unquoted_underscores=True)
+
+
+rule prepare_taxonomy:
+    input:
+        taxonomy_mapping = MERGED_TAXONOMY_INPUT
+    output:
+        taxonomy = TAXONOMY_PATHS["prepared"],
+        trusted_taxa = TAXONOMY_PATHS["trusted_taxa"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    conda:
+        TAXONOMY_ENV
+    script:
+        str(TREE_SCRIPTS / "prepare_taxonomy.py")
+
+
+rule phylorank_decorate:
+    input:
+        tree = TREE_PATHS["rerooted_newick"],
+        trusted_taxa = TAXONOMY_PATHS["trusted_taxa"],
+        taxonomy = TAXONOMY_PATHS["prepared"]
+    output:
+        decorated_tree = TAXONOMY_PATHS["phylorank_tree"]
+    params:
+        command = TAXONOMY_CONFIG["phylorank_command"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    conda:
+        TAXONOMY_ENV
+    shell:
+        """
+        mkdir -p $(dirname {output.decorated_tree})
+        {params.command} decorate -t {input.trusted_taxa} --skip_rd_refine {input.tree} {input.taxonomy} {output.decorated_tree}
+        """
+
+
+rule phylorank_red:
+    input:
+        decorated_tree = TAXONOMY_PATHS["phylorank_tree"],
+        trusted_taxa = TAXONOMY_PATHS["trusted_taxa"],
+        taxonomy = TAXONOMY_PATHS["prepared"]
+    output:
+        red_tree = TAXONOMY_PATHS["red_tree"],
+        red_cutoffs = TAXONOMY_PATHS["red_cutoffs"]
+    params:
+        command = TAXONOMY_CONFIG["phylorank_command"],
+        red_dir = TAXONOMY_PATHS["red_dir"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    conda:
+        TAXONOMY_ENV
+    shell:
+        """
+        mkdir -p {params.red_dir}
+        {params.command} outliers -t {input.trusted_taxa} {input.decorated_tree} {input.taxonomy} {params.red_dir}
+        test -s {output.red_tree}
+        test -s {output.red_cutoffs}
+        """
+
+
+rule assign_taxonomy:
+    input:
+        red_tree = TAXONOMY_PATHS["red_tree"],
+        red_cutoffs = TAXONOMY_PATHS["red_cutoffs"],
+        taxonomy = TAXONOMY_PATHS["prepared"]
+    output:
+        reference_taxonomy = TAXONOMY_PATHS["reference"],
+        target_taxonomy = TAXONOMY_PATHS["target"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    conda:
+        TAXONOMY_ENV
+    script:
+        str(TREE_SCRIPTS / "assign_taxonomy_v4.py")
+
+
+rule generate_metadata:
+    input:
+        reference_taxonomy = TAXONOMY_PATHS["reference"],
+        target_taxonomy = TAXONOMY_PATHS["target"]
+    output:
+        metadata = TAXONOMY_PATHS["metadata"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    conda:
+        TAXONOMY_ENV
+    script:
+        str(TREE_SCRIPTS / "generate_tree_metadata.py")

@@ -1,0 +1,47 @@
+paths:
+  output_root: "output"
+
+  eukcc_db:
+    root_dir: "db/eukcc"
+    archive: "db/eukcc/eukcc2_db_ver_1.2.tar.gz"
+    extracted_dir: "db/eukcc/eukcc2_db_ver_1.2"
+    ready_marker: "db/eukcc/eukcc_db_ready.flag"
+
+  external:
+    metadata:
+      manifest_table: "output/external/metadata/external_genomes.tsv"
+      busco_qc: "output/external/metadata/busco_quality_control_results.tsv"
+      checkm2: "output/external/metadata/checkm2_quality_report.tsv"
+      ncbi_rebuilt_taxonomy: "output/external/metadata/taxonomy_mapping_rebuilt.tsv"
+      eukcc_summary: "output/external/metadata/eukcc_summary.tsv"
+    busco:
+      full_table: "output/external/busco/{group}/{genome_acc}/run_eukaryota_odb12/full_table.tsv"
+      outdir: "output/external/busco/{group}"
+    aggregate:
+      sequences_dir: "output/external/singlem_input"
+      genome_protein_files: "output/external/singlem_genome_input/genome_protein_files.txt"
+      hmms_and_names: "output/external/singlem_genome_input/hmms_and_names_busco.tsv"
+    eukcc:
+      per_genome_dir: "output/external/eukcc/{genome_acc}"
+      per_genome_done: "output/external/eukcc/{genome_acc}/.done"
+
+  merged:
+    gene_faa: "output/merged_input/{gene}.faa"
+
+  taxonomy:
+    prepared: "output/taxonomy/taxonomy.tsv"
+    trusted_taxa: "output/taxonomy/trusted_taxa.txt"
+    reference: "output/taxonomy/taxonomy.revised_reference.tsv"
+    target: "output/taxonomy/target_novelty_taxonomy.tsv"
+    metadata: "output/taxonomy/tree_metadata.tsv"
+    phylorank_tree: "output/taxonomy/tree.midpoint.trusted.norefine.decorated.nwk"
+    red_dir: "output/taxonomy/red_midpoint_trusted_norefine"
+    red_tree: "output/taxonomy/red_midpoint_trusted_norefine/tree.midpoint.trusted.norefine.decorated.red_decorated.tree"
+    red_cutoffs: "output/taxonomy/red_midpoint_trusted_norefine/tree.midpoint.trusted.norefine.decorated.dict"
+
+  tree:
+    famsa: "output/famsa/{gene}.fasta"
+    bmge: "output/bmge/{gene}_bmge.fasta"
+    alignment: "output/alignments/concatinated_alignment.fasta"
+    newick: "output/tree/tree.nwk"
+    rerooted_newick: "output/tree/tree.rerooted.nwk"

@@ -1,0 +1,69 @@
+# Generated workflow outputs and caches
+**/output/
+**/outputs/
+**/.snakemake/
+**/.pixi/
+**/__pycache__/
+**/*.egg-info/
+
+# Generated test data
+/test/busco/
+/test/genomes/
+/test/singlem_output/
+/update_metapackage_output/
+/metapackage_workflow/test/test.fasta
+
+# Databases and downloaded reference data
+**/db/
+**/database/
+**/busco_downloads/
+**/read_taxonomies.sqlite3
+**/*.sqlite
+**/*.sqlite3
+**/*.sqlite3-journal
+**/*.dmnd
+**/*.dmnd.seed_idx
+**/*.hmm
+**/*.hmm.gz
+**/*.mpi
+**/*.pkl
+**/*.pickle
+**/*.tar
+**/*.tar.gz
+**/*.zip
+**/*.smpkg
+
+# Large generated alignment and search artifacts
+**/*.blast6
+**/*.sam
+**/*.bam
+**/*.bai
+**/*.fai
+**/*.npy
+**/*.npz
+
+# Local workflow scratch and downloaded files
+backup/
+**/cache/
+**/logs/
+**/tmp/
+**/real_data/
+**/untracked/
+**/site/
+**/build/
+**/wget-log
+**/download-group?flt=
+**/phylorank.log
+
+# Local machine and editor files
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode/
+.idea/
+
+# Independent repositories managed separately
+/benchmarking_workflow/
+/singlem/
+/singlem-test/

@@ -1,0 +1,58 @@
+
+# Organism groups to process
+groups:
+  - fungi
+  - algae
+
+# JGI API URLs for metadata download
+jgi_config:
+  fungi:
+    json_url: 'https://files.jgi.doe.gov/mycocosm_file_list/?api_version=2&d=asc&group=fungi&ff=%7B%22file_type%22%3A%5B%22assembly%22%5D%2C%22data_type%22%3A%5B%22Genome+Assembly+%28masked%29%22%5D%2C%22data_utilization_status%22%3A%5B%22Unrestricted%22%5D%2C%22file_name_pattern%22%3A%22.*%5C%5C.gz%22%7D&s=name&x=50'
+    meta_url: 'https://mycocosm.jgi.doe.gov/ext-api/mycocosm/catalog/download-group?flt=&seq=all&pub=all&grp=fungi&srt=released&ord=desc'
+  algae:
+    json_url: 'https://files.jgi.doe.gov/mycocosm_file_list/?api_version=2&d=asc&group=phycocosm&ff=%7B%22file_type%22%3A%5B%22assembly%22%5D%2C%22data_type%22%3A%5B%22Genome+Assembly+%28masked%29%22%5D%2C%22data_utilization_status%22%3A%5B%22Unrestricted%22%5D%2C%22file_name_pattern%22%3A%22.*.gz%22%7D&s=name&x=50'
+    meta_url: 'https://phycocosm.jgi.doe.gov/ext-api/phycocosm/catalog/download-group?flt=&seq=all&pub=all&grp=phycocosm&srt=released&ord=desc'
+
+# BUSCO configuration
+busco:
+  lineage: eukaryota_odb12
+  mode: genome
+  quality_control:
+    min_complete_markers: 40
+
+# NCBI Entrez configuration
+ncbi:
+  email: 'mitcheja@qut.edu.au'
+
+# SingleM configuration
+singlem:
+  target_domains: 'Eukaryota'
+  min_sequences_per_gene: 5
+  derep:
+    enabled: true
+    precluster_ani: 90
+    ani: 95
+  off_target:
+    enabled: true
+    genome_fna_list: 'data/off_target_fna_list.txt'
+    taxonomy_mapping: 'outputs/metadata/taxonomy_mapping.tsv'
+    hmm_evalue: 1e-5
+    default_taxonomy: 'd__Bacteria'
+    keep_intermediates: false
+
+# Resource allocation
+resources:
+  base_mem_mb: 4000
+  base_runtime: '4h'
+  total_attempts: 3
+  
+  # Rule-specific overrides
+  busco_threads: 2
+  download_threads: 1
+  coverm_cluster_threads: 64
+
+orchestration:
+  profile: "~/git/hpc_scripts/snakemake_configs/aqua"
+  use_conda: true
+  rerun_incomplete: true
+  extra_args: ""
