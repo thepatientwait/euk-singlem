@@ -31,6 +31,7 @@ configfile: str(PATHS_CONFIG_PATH)
 
 METAPACKAGE_CONFIG = config["metapackage"]
 EXTERNAL_CONFIG    = config["external"]
+OUTGROUP_CONFIG    = config["outgroup"]
 BUSCO_CONFIG       = config["busco"]
 AGGREGATION_CONFIG = config["aggregation"]
 EUKCC_CONFIG       = config["eukcc"]
@@ -77,6 +78,25 @@ EXTERNAL_GENOME_MAP = load_external_genome_map(
     external_manifest=EXTERNAL_MANIFEST,
     external_config=EXTERNAL_CONFIG,
 )
+
+OUTGROUP_ENABLED = bool(OUTGROUP_CONFIG.get("enabled", False))
+if OUTGROUP_ENABLED:
+    OUTGROUP_MANIFEST = Path(OUTGROUP_CONFIG["genome_manifest"])
+    OUTGROUP_GENOME_MAP = (
+        dict(
+            pl.read_csv(OUTGROUP_MANIFEST)
+            .select(
+                pl.col("acc").cast(pl.Utf8),
+                pl.col("path").cast(pl.Utf8),
+            )
+            .iter_rows()
+        )
+    )
+
+
+    EXTERNAL_GENOME_MAP.update(OUTGROUP_GENOME_MAP)
+
+
 EXTERNAL_ACCESSIONS = sorted(EXTERNAL_GENOME_MAP.keys())
 USE_EXTERNAL        = EXTERNAL_ENABLED and len(EXTERNAL_ACCESSIONS) > 0
 
@@ -96,6 +116,8 @@ MERGED_GENES          = build_merged_genes_factory(VALID_GENES, checkpoints, USE
 MERGED_BMGE_TARGETS   = build_merged_bmge_targets_factory(TREE_PATHS, MERGED_GENES)
 MERGED_TAXONOMY_INPUT = build_merged_taxonomy_input_factory(EXTERNAL_PATHS, METAPACKAGE_TAXONOMY, USE_EXTERNAL)
 
+
+localrules: build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
 
 rule all:
     input:
@@ -172,6 +194,9 @@ rule run_external_busco:
         str(METAPACKAGE_SCRIPTS / "run_busco.py")
 
 
+
+
+
 rule external_busco_results_quality_control:
     input:
         busco_results = EXTERNAL_BUSCO_TARGETS
@@ -196,63 +221,66 @@ rule external_build_checkm2_quality_report:
         str(METAPACKAGE_SCRIPTS / "build_checkm2_quality_report.py")
 
 
-rule prepare_eukcc_db:
-    output:
-        archive = EUKCC_DB_PATHS["archive"],
-        extracted_dir = directory(EUKCC_DB_PATHS["extracted_dir"]),
-        ready_marker = EUKCC_DB_PATHS["ready_marker"]
-    params:
-        root_dir = EUKCC_DB_PATHS["root_dir"],
-        db_url = EUKCC_CONFIG["db_url"]
-    retries: TOTAL_ATTEMPTS
-    resources: **DEFAULT_RESOURCES
-    shell:
-        """
-        mkdir -p {params.root_dir}
-        if [ ! -s {output.archive} ]; then
-            wget -O {output.archive} {params.db_url}
-        fi
-        if [ ! -d {output.extracted_dir} ]; then
-            tar -xzvf {output.archive} -C {params.root_dir}
-        fi
-        realpath {output.extracted_dir} > {output.ready_marker}
-        """
+# rule prepare_eukcc_db:
+#     output:
+#         archive = EUKCC_DB_PATHS["archive"],
+#         extracted_dir = directory(EUKCC_DB_PATHS["extracted_dir"]),
+#         ready_marker = EUKCC_DB_PATHS["ready_marker"]
+#     params:
+#         root_dir = EUKCC_DB_PATHS["root_dir"],
+#         db_url = EUKCC_CONFIG["db_url"]
+#     retries: TOTAL_ATTEMPTS
+#     resources: **DEFAULT_RESOURCES
+#     shell:
+#         """
+#         mkdir -p {params.root_dir}
+#         if [ ! -s {output.archive} ]; then
+#             wget -O {output.archive} {params.db_url}
+#         fi
+#         if [ ! -d {output.extracted_dir} ]; then
+#             tar -xzvf {output.archive} -C {params.root_dir}
+#         fi
+#         realpath {output.extracted_dir} > {output.ready_marker}
+#         """
 
 
-rule run_external_eukcc:
-    input:
-        genome         = lambda wildcards: EXTERNAL_GENOME_MAP[wildcards.genome_acc],
-        manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
-        db_ready       = EUKCC_DB_PATHS["ready_marker"]
-    output:
-        done = EXTERNAL_PATHS["eukcc"]["per_genome_done"]
-    params:
-        outdir           = lambda wildcards: EXTERNAL_PATHS["eukcc"]["per_genome_dir"].format(genome_acc=wildcards.genome_acc),
-        command_template = lambda wildcards: EUKCC_CONFIG["command_template"],
-        db_path          = EUKCC_DB_PATH
-    threads: int(EUKCC_CONFIG.get("threads", 8))
-    retries: TOTAL_ATTEMPTS
-    resources: **DEFAULT_RESOURCES
-    # resources: **RESOURCE_PROFILE(mem_scale=20)  # EukCC can be memory intensive, so we scale up memory for this step
-    conda:
-        str(ROOT / "envs" / "eukcc.yaml")
-    script:
-        str(TREE_SCRIPTS / "run_eukcc.py")
+# rule run_external_eukcc:
+#     input:
+#         genome         = lambda wildcards: EXTERNAL_GENOME_MAP[wildcards.genome_acc],
+#         manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
+#         db_ready       = EUKCC_DB_PATHS["ready_marker"]
+#     output:
+#         done = EXTERNAL_PATHS["eukcc"]["per_genome_done"]
+#     params:
+#         outdir           = lambda wildcards: EXTERNAL_PATHS["eukcc"]["per_genome_dir"].format(genome_acc=wildcards.genome_acc),
+#         command_template = lambda wildcards: EUKCC_CONFIG["command_template"],
+#         db_path          = EUKCC_DB_PATH
+#     threads: int(EUKCC_CONFIG.get("threads", 8))
+#     retries: TOTAL_ATTEMPTS
+#     resources: **DEFAULT_RESOURCES
+#     # resources: **RESOURCE_PROFILE(mem_scale=20)  # EukCC can be memory intensive, so we scale up memory for this step
+#     conda:
+#         str(ROOT / "envs" / "eukcc.yaml")
+#     script:
+#         str(TREE_SCRIPTS / "run_eukcc.py")
 
 
-rule summarize_external_eukcc:
-    input:
-        external_manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
-        eukcc_done              = EXTERNAL_EUKCC_DONE_TARGETS
-    output:
-        summary = EXTERNAL_PATHS["metadata"]["eukcc_summary"]
-    params:
-        eukcc_dir_pattern = lambda wildcards: EXTERNAL_PATHS["eukcc"]["per_genome_dir"],
-        taxonomy_hint_file = EUKCC_CONFIG.get("taxonomy_hint_file", "taxonomy.tsv")
-    retries: TOTAL_ATTEMPTS
-    resources: **DEFAULT_RESOURCES
-    script:
-        str(TREE_SCRIPTS / "summarize_eukcc_results.py")
+# rule summarize_external_eukcc:
+#     input:
+#         external_manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
+#         eukcc_done              = EXTERNAL_EUKCC_DONE_TARGETS
+#     output:
+#         summary = EXTERNAL_PATHS["metadata"]["eukcc_summary"]
+#     params:
+#         eukcc_dir_pattern = lambda wildcards: EXTERNAL_PATHS["eukcc"]["per_genome_dir"],
+#         taxonomy_hint_file = EUKCC_CONFIG.get("taxonomy_hint_file", "taxonomy.tsv")
+#     retries: TOTAL_ATTEMPTS
+#     resources: **DEFAULT_RESOURCES
+#     script:
+#         str(TREE_SCRIPTS / "summarize_eukcc_results.py")
+
+
+# if
 
 
 rule rebuild_taxonomy_mapping:
@@ -260,7 +288,7 @@ rule rebuild_taxonomy_mapping:
         base_taxonomy           = str(METAPACKAGE_TAXONOMY),
         external_manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
         external_taxid_map      = str(EXTERNAL_TAXID_MAP) if EXTERNAL_TAXID_MAP.exists() else [],
-        eukcc_summary           = EXTERNAL_PATHS["metadata"]["eukcc_summary"]
+        # eukcc_summary           = EXTERNAL_PATHS["metadata"]["eukcc_summary"]
     output:
         taxonomy = EXTERNAL_PATHS["metadata"]["ncbi_rebuilt_taxonomy"]
     params:
@@ -429,21 +457,69 @@ rule build_tree:
         fasttree -nt {input} > {output}
         """
 
-rule reroot_tree:
-    input:
-        tree = TREE_PATHS["newick"]
-    output:
-        rerooted_tree = TREE_PATHS["rerooted_newick"]
-    retries: TOTAL_ATTEMPTS
-    resources: **DEFAULT_RESOURCES
-    conda:
-        TAXONOMY_ENV
-    run:
-        import dendropy
+if OUTGROUP_ENABLED:
+    rule reroot_tree:
+        input:
+            tree = TREE_PATHS["newick"]
+        output:
+            rerooted_tree = TREE_PATHS["rerooted_newick"]
+        retries: TOTAL_ATTEMPTS
+        resources: **DEFAULT_RESOURCES
+        conda:
+            TAXONOMY_ENV
+        run:
+            import dendropy
 
-        tree = dendropy.Tree.get(path=input.tree, schema="newick", preserve_underscores=True)
-        tree.reroot_at_midpoint(update_bipartitions=False)
-        tree.write(path=output.rerooted_tree, schema="newick", unquoted_underscores=True)
+            # Load the tree with force-rooted option to properly handle tree state
+            tree = dendropy.Tree.get(
+                path=input.tree, 
+                schema="newick", 
+                preserve_underscores=True, 
+                rooting="force-rooted"
+            )
+
+            # Filter keys from the global OUTGROUP_GENOME_MAP that exist in the tree
+            valid_taxa = [acc for acc in OUTGROUP_GENOME_MAP.keys() if acc in tree.taxon_namespace.labels()]
+
+            if valid_taxa and len(valid_taxa) > 1:
+                # Find the Most Recent Common Ancestor (MRCA) of these outgroup genomes
+                mrca_node = tree.mrca(taxon_labels=valid_taxa)
+                
+                if mrca_node and mrca_node.edge:
+                    edge_length = mrca_node.edge.length
+                    length_split = 0.5 * edge_length if edge_length is not None else None
+                    
+                    # Reroot the tree at the edge leading to the MRCA clade
+                    tree.reroot_at_edge(
+                        mrca_node.edge, 
+                        length1=length_split, 
+                        length2=length_split, 
+                        update_bipartitions=False
+                    )
+
+            else:
+                # If no valid outgroup taxa are found, fallback to midpoint rooting
+                tree.reroot_at_midpoint(update_bipartitions=False)
+
+            # Write out the updated tree
+            tree.write(path=output.rerooted_tree, schema="newick", unquoted_underscores=True)
+
+else:
+    rule reroot_tree:
+        input:
+            tree = TREE_PATHS["newick"]
+        output:
+            rerooted_tree = TREE_PATHS["rerooted_newick"]
+        retries: TOTAL_ATTEMPTS
+        resources: **DEFAULT_RESOURCES
+        conda:
+            TAXONOMY_ENV
+        run:
+            import dendropy
+
+            tree = dendropy.Tree.get(path=input.tree, schema="newick", preserve_underscores=True)
+            tree.reroot_at_midpoint(update_bipartitions=False)
+            tree.write(path=output.rerooted_tree, schema="newick", unquoted_underscores=True)
 
 
 rule prepare_taxonomy:
@@ -451,6 +527,7 @@ rule prepare_taxonomy:
         taxonomy_mapping = MERGED_TAXONOMY_INPUT
     output:
         taxonomy = TAXONOMY_PATHS["prepared"],
+        conservative_taxonomy = TAXONOMY_PATHS["conservative"],
         trusted_taxa = TAXONOMY_PATHS["trusted_taxa"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
@@ -508,16 +585,19 @@ rule assign_taxonomy:
     input:
         red_tree = TAXONOMY_PATHS["red_tree"],
         red_cutoffs = TAXONOMY_PATHS["red_cutoffs"],
-        taxonomy = TAXONOMY_PATHS["prepared"]
+        taxonomy = TAXONOMY_PATHS["conservative"]
     output:
         reference_taxonomy = TAXONOMY_PATHS["reference"],
-        target_taxonomy = TAXONOMY_PATHS["target"]
+        target_taxonomy = TAXONOMY_PATHS["target"],
+        # split_map = TAXONOMY_PATHS["split_map"],
+        # combine_map = TAXONOMY_PATHS["combine_map"],
+        # partial_map = TAXONOMY_PATHS["partial_map"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
         TAXONOMY_ENV
     script:
-        str(TREE_SCRIPTS / "assign_taxonomy_v4.py")
+        str(TREE_SCRIPTS / "assign_taxonomy_v5.py")
 
 
 rule generate_metadata:

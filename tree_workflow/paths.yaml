@@ -30,9 +30,13 @@ paths:
 
   taxonomy:
     prepared: "output/taxonomy/taxonomy.tsv"
+    conservative: "output/taxonomy/conservative_taxonomy.tsv"
     trusted_taxa: "output/taxonomy/trusted_taxa.txt"
     reference: "output/taxonomy/taxonomy.revised_reference.tsv"
     target: "output/taxonomy/target_novelty_taxonomy.tsv"
+    split_map: "output/taxonomy/clade_split_map.tsv"
+    combine_map: "output/taxonomy/clade_combine_map.tsv"
+    partial_map: "output/taxonomy/partial_taxonomy_recovery_map.tsv"
     metadata: "output/taxonomy/tree_metadata.tsv"
     phylorank_tree: "output/taxonomy/tree.midpoint.trusted.norefine.decorated.nwk"
     red_dir: "output/taxonomy/red_midpoint_trusted_norefine"

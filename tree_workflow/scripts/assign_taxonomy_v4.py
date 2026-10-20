@@ -709,6 +709,9 @@ def main():
         TAXONOMY_PATH = str(snakemake.input.taxonomy)
         REVISED_REFERENCE_TAXONOMY_OUTPUT = str(snakemake.output.reference_taxonomy)
         TARGET_NOVELTY_OUTPUT = str(snakemake.output.target_taxonomy)
+        SPLIT_MAP_OUTPUT = str(snakemake.output.split_map)
+        COMBINE_MAP_OUTPUT = str(snakemake.output.combine_map)
+        PARTIAL_TAXONOMY_MAP_OUTPUT = str(snakemake.output.partial_map)
 
     RED_CUTOFFS = load_red_cutoffs(RED_CUTOFFS_PATH)
     print(f"Loaded RED cutoffs: {RED_CUTOFFS}")
@@ -767,6 +770,7 @@ def main():
     # ---- PART 2: repair/anchor partial taxon strings in the revised clade structure ----
     partial_counters = defaultdict(int)
     partial_map = recover_partial_taxonomy_map(known_taxonomy, tree=tree)
+    pl.DataFrame(partial_map).write_csv(PARTIAL_TAXONOMY_MAP_OUTPUT, separator="\t")
     if partial_map:
         print(f"Recorded {len(partial_map)} partial-taxonomy recovery record(s)")
 
@@ -780,6 +784,9 @@ def main():
         print(f"  ... and {len(combine_log) - 20} more")
     if combine_log:
         print(f"Recorded {len(combine_log)} combine event(s)")
+
+    pl.DataFrame(subdivision_log).write_csv(SPLIT_MAP_OUTPUT, separator="\t")
+    pl.DataFrame(combine_log).write_csv(COMBINE_MAP_OUTPUT, separator="\t")
 
     # ---- write revised reference taxonomy (new file, original untouched) ----
     ref_rows = build_reference_taxonomy_rows(tree, known_taxonomy, partial_counters)

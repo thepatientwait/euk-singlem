@@ -70,7 +70,7 @@ def main() -> None:
     base_taxonomy_file = Path(str(snakemake.input.base_taxonomy))
     external_manifest_table = Path(str(snakemake.input.external_manifest_table))
     external_taxid_map_file = Path(str(snakemake.input.external_taxid_map))
-    eukcc_summary_file = Path(str(snakemake.input.eukcc_summary))
+    # eukcc_summary_file = Path(str(snakemake.input.eukcc_summary))
 
     output_file = Path(str(snakemake.output.taxonomy))
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -87,10 +87,10 @@ def main() -> None:
     else:
         external_taxids_df = pl.DataFrame(schema={"acc": pl.Utf8, "ncbi_id": pl.Utf8})
 
-    if eukcc_summary_file.exists() and eukcc_summary_file.stat().st_size > 0:
-        eukcc_df = pl.read_csv(eukcc_summary_file, separator="\t")
-    else:
-        eukcc_df = pl.DataFrame(schema={"acc": pl.Utf8, "eukcc_taxonomy": pl.Utf8})
+    # if eukcc_summary_file.exists() and eukcc_summary_file.stat().st_size > 0:
+    #     eukcc_df = pl.read_csv(eukcc_summary_file, separator="\t")
+    # else:
+    #     eukcc_df = pl.DataFrame(schema={"acc": pl.Utf8, "eukcc_taxonomy": pl.Utf8})
 
     base_cols = [col for col in ["acc", "ncbi_id", "parsed_taxon_string"] if col in base_df.columns]
     base_df = base_df.select(base_cols)
@@ -118,9 +118,9 @@ def main() -> None:
     taxonomy_rows = []
     missing_requery = []
 
-    eukcc_tax_map = {}
-    if "acc" in eukcc_df.columns and "eukcc_taxonomy" in eukcc_df.columns:
-        eukcc_tax_map = dict(zip(eukcc_df["acc"].to_list(), eukcc_df["eukcc_taxonomy"].to_list()))
+    # eukcc_tax_map = {}
+    # if "acc" in eukcc_df.columns and "eukcc_taxonomy" in eukcc_df.columns:
+    #     eukcc_tax_map = dict(zip(eukcc_df["acc"].to_list(), eukcc_df["eukcc_taxonomy"].to_list()))
 
     base_tax_map = {}
     if "acc" in base_df.columns and "parsed_taxon_string" in base_df.columns:
@@ -144,10 +144,10 @@ def main() -> None:
             if parsed_taxon_string:
                 source = "fallback_existing"
 
-        if not parsed_taxon_string:
-            parsed_taxon_string = eukcc_tax_map.get(acc)
-            if parsed_taxon_string:
-                source = "fallback_eukcc"
+        # if not parsed_taxon_string:
+        #     parsed_taxon_string = eukcc_tax_map.get(acc)
+        #     if parsed_taxon_string:
+        #         source = "fallback_eukcc"
 
         taxonomy_rows.append(
             {

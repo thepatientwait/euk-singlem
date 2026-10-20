@@ -4,17 +4,22 @@ metapackage:
   taxonomy_mapping: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/metadata/taxonomy_mapping.tsv"
 
 external:
-  enabled: false
+  enabled: true
   group_name: "external"
   genome_manifest: "inputs/external_genomes.paths"
   cluster_table: "/work/microbiome/binchicken/DeepOceanEukaryotes/clusters/genome_clusters_95.tsv"
   cluster_base_dir: "/work/microbiome/binchicken/DeepOceanEukaryotes"
   ncbi_taxid_map: "inputs/external_genome_taxids.tsv"
 
+outgroup:
+  enabled: true
+  name: "outgroup"
+  genome_manifest: "metadata/asgard_genomes.csv"
+
 busco:
   lineage: "eukaryota_odb12"
   mode: "genome"
-  min_complete_markers: 40
+  min_complete_markers: 1
 
 aggregation:
   min_sequences_per_gene: 1
