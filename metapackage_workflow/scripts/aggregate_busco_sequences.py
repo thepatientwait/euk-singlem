@@ -17,7 +17,8 @@ from log_config import configure_logger
 logger = configure_logger(__file__)
 
 
-def parse_busco_file(busco_file: Path) -> Tuple[str, str, pl.DataFrame]:
+
+def parse_busco_file(busco_file: Path, use_multi_copy: bool) -> Tuple[str, str, pl.DataFrame]:
     """
     Parse a BUSCO results file and extract group, genome_acc, and complete genes.
     
@@ -54,9 +55,10 @@ def parse_busco_file(busco_file: Path) -> Tuple[str, str, pl.DataFrame]:
     # Keep every complete or duplicated hit, with copy 1 being the best-scoring hit.
     selected_genes = (
         busco_df
-        .filter(pl.col('Status').is_in(['Complete', 'Duplicated']))
+        .filter(pl.col('Status').is_in(['Complete'] + (['Duplicated'] if use_multi_copy else [])))
         .with_columns(pl.col('Score').cast(pl.Float64, strict=False))
         .sort(['Busco id', 'Score'], descending=[False, True], nulls_last=True)
+        .unique(subset=['Busco id'], keep='first')
     )
     
     logger.info(f"Found {len(selected_genes)} complete/duplicated genes for {group}/{genome_acc}")
@@ -164,7 +166,8 @@ def calculate_sequence_length(sequence: str) -> int:
         return len(sequence.replace('\n', ''))
 
 
-def process_single_busco_file(busco_file_str: str) -> Tuple[Dict[str, Dict], Optional[str]]:
+
+def process_single_busco_file(busco_file_str: str, use_multi_copy: bool) -> Tuple[Dict[str, Dict], Optional[str]]:
     """
     Process a single BUSCO file and return results.
     
@@ -184,7 +187,7 @@ def process_single_busco_file(busco_file_str: str) -> Tuple[Dict[str, Dict], Opt
     
     try:
         # Parse BUSCO results
-        group, genome_acc, selected_genes = parse_busco_file(busco_file)
+        group, genome_acc, selected_genes = parse_busco_file(busco_file, use_multi_copy)
         
         # Extract gene sequences
         gene_data = extract_gene_sequences(busco_file, selected_genes, group, genome_acc)
@@ -227,7 +230,8 @@ def merge_gene_sequences(results: List[Tuple[Dict[str, Dict], Optional[str]]]) -
     return dict(gene_sequences), critical_errors
 
 
-def process_all_busco_results(busco_files: List[str]) -> Dict[str, Dict]:
+
+def process_all_busco_results(busco_files: List[str], use_multi_copy: bool) -> Dict[str, Dict]:
     """
     Process all BUSCO result files and extract gene sequences using multiprocessing.
     
@@ -246,7 +250,7 @@ def process_all_busco_results(busco_files: List[str]) -> Dict[str, Dict]:
     # Process files in parallel
     logger.info("Starting parallel processing of BUSCO files...")
     results = Parallel(n_jobs=n_jobs, prefer="threads", verbose=1)(
-        delayed(process_single_busco_file)(busco_file) 
+        delayed(process_single_busco_file)(busco_file, use_multi_copy) 
         for busco_file in busco_files
     )
     
@@ -311,6 +315,45 @@ def deduplicate_sequences(genome_sequences: Dict) -> Tuple[Dict, int]:
     return deduplicated, duplicates_removed
 
 
+def resolve_sequence_taxonomy(seq_id: str, info: Dict, taxonomy_df: pl.DataFrame) -> Optional[str]:
+    """Return a GTDB-style taxonomy string for a sequence, or None if unresolved."""
+    original_genome_acc = info.get('original_genome_acc', seq_id)
+    tax_row = taxonomy_df.filter(pl.col('acc') == str(original_genome_acc))
+    if len(tax_row) == 0:
+        return None
+    taxonomy = tax_row['parsed_taxon_string'][0]
+    if not taxonomy or ';' not in taxonomy:
+        return None
+    return taxonomy
+
+
+def filter_resolved_sequences(deduplicated_sequences: Dict, taxonomy_df: pl.DataFrame,
+                              busco_id: str) -> Dict:
+    """
+    Keep only sequences whose genome has a usable taxonomy entry.
+
+    FASTA and taxonomy outputs must contain the same sequence set, otherwise
+    downstream tools like graftM create fail with 'Unable to find sequence in
+    the taxonomy definition'.
+    """
+    kept = {}
+    skipped = 0
+
+    for seq_id, info in deduplicated_sequences.items():
+        if resolve_sequence_taxonomy(seq_id, info, taxonomy_df) is None:
+            skipped += 1
+            continue
+        kept[seq_id] = info
+
+    if skipped > 0:
+        logger.info(
+            f"{busco_id}: excluding {skipped} sequences without taxonomy "
+            f"from FASTA/taxonomy outputs ({len(kept)} remaining)"
+        )
+
+    return kept
+
+
 def write_gene_fasta(busco_id: str, deduplicated_sequences: Dict, output_dir: Path) -> Path:
     """
     Write FASTA file for a single gene with pre-deduplicated sequences.
@@ -359,28 +402,17 @@ def write_taxonomy_file(busco_id: str, deduplicated_sequences: Dict,
     tax_file = output_dir / f"{busco_id}_taxonomy.tsv"
     written = 0
     skipped = 0
-    
+
     with open(tax_file, 'w') as f:
         f.write("sequence_id\ttaxonomy\n")
-        
+
         for seq_id, info in deduplicated_sequences.items():
-            # Use original genome accession for taxonomy lookup
-            original_genome_acc = info.get('original_genome_acc', seq_id)
-            
-            # Look up taxonomy for the original taxon
-            tax_row = taxonomy_df.filter(pl.col('acc') == str(original_genome_acc))
-            
-            if len(tax_row) > 0:
-                taxonomy = tax_row['parsed_taxon_string'][0]
-                if not taxonomy or ';' not in taxonomy:
-                    skipped += 1
-                    logger.debug(f"Skipping {seq_id}: taxonomy for {original_genome_acc} is too shallow ({taxonomy})")
-                    continue
-            else:
+            taxonomy = resolve_sequence_taxonomy(seq_id, info, taxonomy_df)
+            if taxonomy is None:
                 skipped += 1
-                logger.debug(f"Skipping {seq_id}: no taxonomy found for {original_genome_acc}")
+                logger.debug(f"Skipping {seq_id}: no usable taxonomy")
                 continue
-            
+
             # Write using the deduplicated sequence ID
             f.write(f"{seq_id}\t{taxonomy}\n")
             written += 1
@@ -426,12 +458,27 @@ def reorganize_for_singlem_genome_input(
             genome_sequences[genome_acc][sequence_id] = seq_info
     
     logger.info(f"Found {len(genome_sequences)} genomes with BUSCO sequences")
-    
+
+    # Genomes without a usable taxonomy cannot be used downstream; exclude them
+    # from the genome FASTAs, genome list, and genome taxonomy file alike.
+    resolved_accs = set(
+        taxonomy_df
+        .filter(
+            pl.col('parsed_taxon_string').is_not_null()
+            & (pl.col('parsed_taxon_string') != '')
+        )['acc']
+        .to_list()
+    )
+
     # Write genome-centric FASTA files
     processed_genomes = []
     genome_file_paths = []
-    
+    skipped_no_taxonomy = 0
+
     for genome_id, busco_seqs in genome_sequences.items():
+        if genome_id not in resolved_accs:
+            skipped_no_taxonomy += 1
+            continue
         if len(busco_seqs) >= min_sequences_per_gene:
             genome_file = genomes_dir / f"{genome_id}.faa"
             
@@ -455,7 +502,12 @@ def reorganize_for_singlem_genome_input(
             logger.debug(f"Wrote {len(busco_seqs)} sequences for genome {genome_id}")
         else:
             logger.debug(f"Skipping genome {genome_id} (only {len(busco_seqs)} sequences)")
-    
+
+    if skipped_no_taxonomy > 0:
+        logger.info(
+            f"Excluded {skipped_no_taxonomy} genomes without taxonomy from genome-input outputs"
+        )
+
     # Write genome file list
     genome_list_file = output_dir / "genome_protein_files.txt"
     with open(genome_list_file, 'w') as f:
@@ -533,6 +585,15 @@ def write_gene_files(gene_sequences: Dict[str, Dict], taxonomy_df: pl.DataFrame,
                 if duplicates_removed > 0:
                     logger.info(f"Removed {duplicates_removed} duplicate sequences from {busco_id} "
                                f"({len(deduplicated_seqs)} unique sequences remaining)")
+
+                # Keep only sequences with a usable taxonomy so the FASTA and
+                # taxonomy TSV always describe the same sequence set.
+                deduplicated_seqs = filter_resolved_sequences(
+                    deduplicated_seqs, taxonomy_df, busco_id
+                )
+                if not deduplicated_seqs:
+                    logger.warning(f"Skipping {busco_id}: no sequences with resolved taxonomy")
+                    continue
                 
                 # Write FASTA file with deduplicated sequences
                 fasta_file = write_gene_fasta(busco_id, deduplicated_seqs, output_dir)
@@ -563,6 +624,7 @@ def main():
     manifest_file = Path(snakemake.input.busco_manifest)
     output_dir = Path(snakemake.output.sequences_dir)
     taxonomy_file = snakemake.input.taxonomy
+    use_multi_copy = snakemake.params.get('use_multi_copy', False)
 
     if not manifest_file.exists():
         raise FileNotFoundError(f"BUSCO manifest file not found: {manifest_file}")
@@ -589,7 +651,7 @@ def main():
     logger.info(f"Loaded taxonomy mapping with {len(taxonomy_df)} entries")
     
     # Process all BUSCO results - let errors bubble up
-    gene_sequences = process_all_busco_results(busco_results)
+    gene_sequences = process_all_busco_results(busco_results, use_multi_copy)
     
     # Validate we got meaningful results
     if not gene_sequences:

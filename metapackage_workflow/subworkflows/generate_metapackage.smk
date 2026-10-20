@@ -6,9 +6,10 @@ sys.path.insert(0, str(ROOT))
 
 # config
 # ------
-CONFIG_PATH       = ROOT / "config.yaml"
-PATHS_CONFIG_PATH = ROOT / "paths.yaml"
-SCRIPTS_DIR       = ROOT / "scripts"
+SCRIPTS_DIR         = ROOT / "scripts"
+CONFIG_DIR          = ROOT / "config"
+CONFIG_PATH         = CONFIG_DIR / "config.yaml"
+PATHS_CONFIG_PATH   = CONFIG_DIR / "paths.yaml"
 
 from helpers import (
     build_off_target_genome_targets_factory,
@@ -25,7 +26,7 @@ configfile: str(PATHS_CONFIG_PATH)
 
 # workflow
 GROUPS       = config["groups"]
-BUSCO_GROUPS = GROUPS + ["p10k"]
+BUSCO_GROUPS = GROUPS + ["p10k", "ncbi"]
 DOWNLOAD     = config["download"]
 BUSCO        = config["generate"]["busco"]
 SINGLEM      = config["generate"]["singlem"]
@@ -37,6 +38,7 @@ OFF_TARGET_CONFIG = config["singlem"].get("off_target", {})
 OFF_TARGET_ENABLED = OFF_TARGET_CONFIG.get("enabled", False)
 OFF_TARGET_INPUT = OFF_TARGET["input"]
 SINGLEM_ENV  = (ROOT / COMMON["environments"]["singlem"]).resolve()
+GRAFTM_ENV   = (ROOT / COMMON["environments"]["graftm"]).resolve()
 
 # resources
 BASE_MEM_MB    = config["resources"]["base_mem_mb"]
@@ -130,7 +132,8 @@ def COLLECT_PER_GENOME_OFF_TARGET_RESULTS(wildcards):
 
 rule all:
     input:
-        SINGLEM["metapackages"]["final"]
+        SINGLEM["metapackages"]["final"],
+        BUSCO_RESULTS_FROM_MANIFEST
 
 
 rule init_busco_lineage_cache:
@@ -157,7 +160,7 @@ rule init_busco_lineage_cache:
 rule run_busco:
     input:
         genome = DOWNLOAD["genomes"]["by_group"],
-        lineage_ready = BUSCO_LINEAGE_READY
+        lineage_ready = ancient(BUSCO_LINEAGE_READY)
     output:
         full_table = BUSCO["full_table"]
     params:
@@ -182,7 +185,8 @@ rule busco_results_quality_control:
     output:
         manifest = BUSCO["quality_control_results"]
     params:
-        min_complete_markers = config["busco"]["quality_control"]["min_complete_markers"]
+        min_complete_markers = config["busco"]["quality_control"]["min_complete_markers"],
+        use_multi_copy = config["busco"]["quality_control"].get("use_multi_copy", False)
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     script:
@@ -248,11 +252,11 @@ def BUSCO_MANIFEST_FOR_AGGREGATION(wildcards):
         return checkpoints.dereplicate_genomes.get().output.filtered_manifest
     return BUSCO["quality_control_results"]
 
+# TODO: ADD NCBI GENOMES...
 
 checkpoint aggregate_busco_sequences:
     input:
         quality_report = config["generate"]["quality_report"]["checkm2_style"],
-        metadata_files = [DOWNLOAD["metadata"]["jgi"]["csv"].format(group=group) for group in GROUPS] + [DOWNLOAD["metadata"]["p10k"]["csv"]],
         busco_manifest = BUSCO_MANIFEST_FOR_AGGREGATION,
         taxonomy      = DOWNLOAD["metadata"]["taxonomy"]["mapping"]
     output:
@@ -260,7 +264,8 @@ checkpoint aggregate_busco_sequences:
         genome_input_genomes = SINGLEM["genome_input"]["genome_protein_files"],
         genome_input_hmms    = SINGLEM["genome_input"]["hmms_and_names"]
     params:
-        min_sequences_per_gene = config["singlem"]["min_sequences_per_gene"]
+        min_sequences_per_gene = config["singlem"]["min_sequences_per_gene"],
+        use_multi_copy = config["busco"]["quality_control"].get("use_multi_copy", False)
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     threads: 16
@@ -282,7 +287,7 @@ rule graftm_create:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=2.0)
     conda:
-        str(SINGLEM_ENV)
+        str(GRAFTM_ENV)
     shell:
         "graftM create --min_aligned_percent 0 --force "
         "--sequences {input.aa_sequences_file} "
@@ -537,6 +542,8 @@ rule aggregate_transcript_taxonomy:
         combined_otu = TRANSCRIPTS["aggregate"]["combined_otu"]
     threads: 1
     retries: TOTAL_ATTEMPTS
+    conda:
+        str(SINGLEM_ENV)
     resources: **DEFAULT_RESOURCES
     shell:
         """

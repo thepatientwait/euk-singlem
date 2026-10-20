@@ -18,7 +18,8 @@ def _extract_group_and_genome_acc(path: Path) -> Tuple[str, str]:
     return "unknown", "unknown"
 
 
-def _count_complete_markers(busco_result: Path) -> Optional[int]:
+
+def _count_complete_markers(busco_result: Path, use_multi_copy: bool) -> Optional[int]:
     try:
         complete_count = 0
         with open(busco_result, "r", encoding="utf-8") as handle:
@@ -26,8 +27,9 @@ def _count_complete_markers(busco_result: Path) -> Optional[int]:
                 if not line or line.startswith("#"):
                     continue
                 parts = line.rstrip("\n").split("\t")
-                if len(parts) > 1 and parts[1] == "Complete":
-                    complete_count += 1
+                if len(parts) > 1 and (parts[1] == "Complete" or parts[1] == "Duplicated"):
+                    if use_multi_copy or parts[1] == "Complete":
+                        complete_count += 1
         return complete_count
     except Exception as error:
         logger.warning("Could not parse BUSCO result %s: %s", busco_result, error)
@@ -36,6 +38,7 @@ def _count_complete_markers(busco_result: Path) -> Optional[int]:
 
 def main() -> None:
     busco_results = [Path(p) for p in snakemake.input.busco_results]
+    use_multi_copy = bool(snakemake.params.use_multi_copy)
     output_file = Path(snakemake.output.manifest)
     min_complete_markers = int(snakemake.params.min_complete_markers)
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -54,7 +57,7 @@ def main() -> None:
             missing_files += 1
             continue
 
-        complete_count = _count_complete_markers(busco_result)
+        complete_count = _count_complete_markers(busco_result, use_multi_copy)
         if complete_count is None:
             parse_failures += 1
             continue

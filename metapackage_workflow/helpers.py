@@ -68,7 +68,7 @@ def _get_genomes_with_transcripts_cached(
     unique_pairs = manifest_df.select(["group", "genome_acc"]).unique()
     return sorted(
         [
-            f"outputs/transcript_taxonomy/{row['group']}/{row['genome_acc']}.otu_table.tsv"
+            f"outputs/transcripts/taxonomy/{row['group']}/{row['genome_acc']}.otu_table.tsv"
             for row in unique_pairs.iter_rows(named=True)
         ]
     )
@@ -157,7 +157,7 @@ def get_busco_mem_mb(base_mem_mb: int, total_attempts: int) -> Callable:
 @cache_manager.cache_results
 def get_jgi_genome_accs(group: str) -> Tuple[List[str], pl.DataFrame]:
     """Parse JGI data and return list of genome accessions for a group."""
-    with open(f"data/{group}.json", "r", encoding="utf-8") as handle:
+    with open(f"outputs/metadata/source/jgi/{group}.json", "r", encoding="utf-8") as handle:
         data = json.load(handle)
 
     query = jq.compile(
@@ -175,7 +175,11 @@ def get_jgi_genome_accs(group: str) -> Tuple[List[str], pl.DataFrame]:
 
     file_id = pl.DataFrame(query.input(data).all()).unique()
     ncbi_id = (
-        pl.read_csv(f"data/{group}_meta.csv", encoding="latin-1", ignore_errors=True)
+        pl.read_csv(
+            f"outputs/metadata/source/jgi/{group}_meta.csv",
+            encoding="latin-1",
+            ignore_errors=True,
+        )
         .select(["name", "NCBI Taxon", "portal"])
     )
     df = file_id.join(ncbi_id, left_on="genome_acc", right_on="portal", how="left")
@@ -190,7 +194,7 @@ def get_genome_name(group: str, genome_acc: str) -> str:
 
 @lru_cache(maxsize=1)
 def get_p10k_genome_accs() -> List[str]:  # type: ignore[misc]
-    df = pl.read_csv("data/p10k_meta.csv")
+    df = pl.read_csv("outputs/metadata/source/p10k/p10k_meta.csv")
 
     # filter bad urls
     df = df.filter(pl.col("DNA").str.contains(r"https?://"))
@@ -204,12 +208,22 @@ def get_p10k_genome_accs_list() -> List[str]:  # type: ignore[no-redef]
 
 @lru_cache(maxsize=1)
 def _get_p10k_genome_urls():  # type: ignore[misc]
-    df = pl.read_csv("data/p10k_meta.csv")
+    df = pl.read_csv("outputs/metadata/source/p10k/p10k_meta.csv")
     return df
 
 def get_p10k_genome_url(genome_acc: str) -> str:
     df = _get_p10k_genome_urls()
     return df.filter(pl.col("Accession") == genome_acc)["DNA"][0]
+
+
+@lru_cache(maxsize=1)
+def get_ncbi_genome_accs() -> Tuple[str, ...]:
+    metadata = Path("outputs/metadata/source/ncbi/ncbi_genomes.tsv")
+    if not metadata.exists():
+        return tuple()
+    return tuple(
+        pl.read_csv(metadata, separator="\t")["genome_acc"].unique().sort().to_list()
+    )
 
 
 @lru_cache(maxsize=128)
@@ -251,6 +265,7 @@ def build_all_genomes_to_download(
     groups: List[str],
     jgi_checkpoint_getter: Callable,
     p10k_checkpoint_getter: Callable,
+    ncbi_checkpoint_getter: Callable,
 ) -> Callable:
     def _get_all_genomes_to_download(wildcards):
         all_genomes = []
@@ -264,6 +279,10 @@ def build_all_genomes_to_download(
         p10k_checkpoint_getter()
         for genome_acc in sorted(get_p10k_genome_accs()):
             all_genomes.append(f"outputs/genomes/p10k/{genome_acc}.fasta.gz")
+
+        ncbi_checkpoint_getter()
+        for genome_acc in get_ncbi_genome_accs():
+            all_genomes.append(f"outputs/genomes/ncbi/{genome_acc}.fasta.gz")
 
         return all_genomes
 
@@ -280,10 +299,23 @@ def get_existing_genome_paths_from_metadata(groups: List[str]) -> List[str]:
             if path.exists() and path.stat().st_size > 0:
                 genome_paths.append(str(path))
 
+    print(f"Found {len(genome_paths)} existing genomes from JGI metadata.")
+    jgi_count = len(genome_paths)
+
     for genome_acc in sorted(get_p10k_genome_accs()):
         path = Path(f"outputs/genomes/p10k/{genome_acc}.fasta.gz")
         if path.exists() and path.stat().st_size > 0:
             genome_paths.append(str(path))
+
+    print(f"Found {len(genome_paths) - jgi_count} existing genomes from P10K metadata.")
+    p10k_count = len(genome_paths) - jgi_count
+
+    for genome_acc in get_ncbi_genome_accs():
+        path = Path(f"outputs/genomes/ncbi/{genome_acc}.fasta.gz")
+        if path.exists() and path.stat().st_size > 0:
+            genome_paths.append(str(path))
+
+    print(f"Found {len(genome_paths) - jgi_count - p10k_count} existing genomes from NCBI metadata.")
 
     return sorted(genome_paths)
 
@@ -338,7 +370,7 @@ def get_genomes_with_transcripts_factory(manifest_file: str) -> Callable:
 
 def get_discovered_busco_genes(
     checkpoint_getter: Optional[Callable] = None,
-    singlem_input_dir: str = "outputs/singlem_input",
+    singlem_input_dir: str = "outputs/singlem/input",
 ) -> List[str]:
     if checkpoint_getter is not None:
         checkpoint_getter()
@@ -349,7 +381,7 @@ def get_discovered_busco_genes(
 
 def collect_final_packages_factory(
     checkpoint_getter: Optional[Callable] = None,
-    final_packages_dir: str = "outputs/euk_packages/final_packages",
+    final_packages_dir: str = "outputs/singlem/packages/final",
 ) -> Callable:
     def _collect_final_packages(wildcards):
         busco_genes = get_discovered_busco_genes(checkpoint_getter=checkpoint_getter)

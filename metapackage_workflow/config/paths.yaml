@@ -1,0 +1,132 @@
+# Centralized path definitions for euk-singlem metapackage workflow
+# Organized by workflow phase and purpose
+
+# === Phase 1: Download Data ===
+download:
+  done_flag: "outputs/orchestration/phase1_download.done"
+
+  metadata:
+    jgi:
+      json: "outputs/metadata/source/jgi/{group}.json"
+      csv: "outputs/metadata/source/jgi/{group}_meta.csv"
+    p10k:
+      csv: "outputs/metadata/source/p10k/p10k_meta.csv"
+    taxonomy:
+      mapping: "outputs/metadata/taxonomy/taxonomy_mapping.tsv"
+    ncbi:
+      metadata: "outputs/metadata/source/ncbi/ncbi_genomes.tsv"
+      lineages: "outputs/metadata/taxonomy/ncbi_lineages.jsonl"
+
+  genomes:
+    by_group: "outputs/genomes/{group}/{genome_acc}.fasta.gz"
+    ncbi: "outputs/genomes/ncbi/{genome_acc}.fasta.gz"
+    p10k: "outputs/genomes/p10k/{genome_acc}.fasta.gz"
+
+  cleanup:
+    report: "outputs/metadata/reports/failed_genome_cleanup_report.tsv"
+    done_flag: "outputs/metadata/reports/cleanup_failed_genomes.done"
+
+  manifest:
+    genome: "outputs/metadata/manifests/genomes_to_process.paths"
+    unified: "outputs/metadata/manifests/unified_download_manifest.tsv"
+
+# === Phase 2: Generate SingleM/GraftM Packages ===
+generate:
+  done_flag: "outputs/orchestration/phase2_generate.done"
+
+  busco:
+    full_table: "outputs/busco/{group}/{genome_acc}/run_eukaryota_odb12/full_table.tsv"
+    quality_control_results: "outputs/metadata/qc/busco_quality_control_results.tsv"
+    output_dir: "outputs/busco/{group}"
+
+  quality_report:
+    checkm2_style: "outputs/metadata/qc/checkm2_quality_report.tsv"
+
+  derep_manifest:
+    busco_filtered: "outputs/metadata/qc/busco_quality_control_dereplicated.tsv"
+
+  derep:
+    cluster_definitions: "outputs/metadata/qc/genome_clusters.tsv"
+    representatives: "outputs/metadata/qc/dereplicated_genome_representatives.txt"
+
+  singlem:
+    config:
+      output_directory: "outputs/singlem"
+      metapackage_path: "outputs/singlem/metapackage.smpkg"
+      genome_packages_dir: "outputs/singlem/genome_packages"
+      genome_packages_metapackage: "outputs/singlem/genome_packages/eukaryotic_busco_metapackage.smpkg"
+    off_target:
+      input:
+        genome_fna_list: "outputs/metadata/source/off_target_fna_list.txt"
+        taxonomy_mapping: "outputs/metadata/taxonomy/taxonomy_mapping.tsv"
+        gtdb_metadata:
+          archaea: "/mnt/hpccs01/work/microbiome/db/gtdb/gtdb_release226/ar53_metadata_r226.tsv.gz"
+          bacteria: "/mnt/hpccs01/work/microbiome/db/gtdb/gtdb_release226/bac120_metadata_r226.tsv.gz"
+        # GTDB representative genomes database root.
+        # Example resolved path:
+        # /mnt/hpccs01/work/microbiome/db/gtdb/gtdb_release226/genomic_files_reps/gtdb_genomes_reps_r226/database/GCF/000/006/685/GCF_000006685.1_genomic.fna.gz
+        gtdb_genomes_database_dir: "/mnt/hpccs01/work/microbiome/db/gtdb/gtdb_release226/genomic_files_reps/gtdb_genomes_reps_r226/database"
+        # Optional fallback template for pre-materialized genome FASTA paths.
+        genome_by_accession: null
+      hmms:
+        concatenated: "outputs/singlem/off_target/new_hmms_concat.hmm"
+        ids: "outputs/singlem/off_target/new_hmms_ids.tsv"
+        done: "outputs/singlem/off_target/acquire_hmms.done"
+      per_genome:
+        result: "outputs/singlem/off_target/per_genome_results/{off_target_id}.tsv"
+      search:
+        results: "outputs/singlem/off_target/hmmsearch/{off_target_id}.txt"
+        matches: "outputs/singlem/off_target/get_matches/{off_target_id}.tsv"
+        sequences: "outputs/singlem/off_target/mfqe/{off_target_id}.faa"
+      aggregate:
+        dir: "outputs/singlem/off_target/hmmseq_concat"
+        done: "outputs/singlem/off_target/aggregate.done"
+        sequences: "outputs/singlem/off_target/hmmseq_concat/{busco_gene}.faa"
+        taxonomy: "outputs/singlem/off_target/hmmseq_concat/{busco_gene}_taxonomy.tsv"
+      prepare:
+        done: "outputs/singlem/off_target/prepare.done"
+        sequences: "outputs/singlem/off_target/prepared/{busco_gene}.faa"
+        taxonomy: "outputs/singlem/off_target/prepared/{busco_gene}_taxonomy.tsv"
+      regenerate:
+        spkg: "outputs/singlem/packages/regenerated/{busco_gene}.spkg"
+    gene_input:
+      sequences_dir: "outputs/singlem/input"
+      gene:
+        fasta: "outputs/singlem/input/{busco_gene}.faa"
+        taxonomy: "outputs/singlem/input/{busco_gene}_taxonomy.tsv"
+    genome_input:
+      genomes_dir: "outputs/singlem/genome_input/genomes"
+      genome_protein_files: "outputs/singlem/genome_input/genome_protein_files.txt"
+      hmms_and_names: "outputs/singlem/genome_input/hmms_and_names_busco.tsv"
+      genome_taxonomy: "outputs/singlem/genome_input/genome_taxonomy.tsv"
+    windows:
+      positions: "outputs/singlem/packages/windows/{busco_gene}.window_position.txt"
+    packages:
+      initial_spkg: "outputs/singlem/packages/initial/{busco_gene}.spkg"
+      final_spkg: "outputs/singlem/packages/final/{busco_gene}.spkg"
+      regenerated_spkg: "outputs/singlem/packages/regenerated/{busco_gene}.spkg"
+    metapackages:
+      draft: "outputs/singlem/metapackages/draft.smpkg"
+      final: "outputs/singlem/metapackages/final.smpkg"
+      valid_packages_manifest: "outputs/metadata/qc/valid_singlem_packages.txt"
+      invalid_packages_report: "outputs/metadata/reports/invalid_singlem_packages.tsv"
+
+  graftm:
+    package: "outputs/singlem/packages/graftm/{busco_gene}.gpkg"
+    alignment: "outputs/singlem/packages/graftm/{busco_gene}.gpkg/{busco_gene}.gpkg.refpkg/{busco_gene}_deduplicated_aligned.fasta"
+
+  transcripts:
+    extracted: "outputs/transcripts/extracted/{group}/{genome_acc}.fasta"
+    singlem_otu: "outputs/transcripts/singlem/{group}/{genome_acc}.otu_table.tsv"
+    taxonomy_otu: "outputs/transcripts/taxonomy/{group}/{genome_acc}.otu_table.tsv"
+    aggregate:
+      combined_otu: "outputs/transcripts/aggregate/transcripts.otu_table.tsv"
+      sdb: "outputs/transcripts/aggregate/transcripts.sdb"
+
+common:
+  busco_hmm:
+    dir: "busco_downloads/lineages/eukaryota_odb12/hmms"
+    file: "busco_downloads/lineages/eukaryota_odb12/hmms/{busco_gene}.hmm"
+  environments:
+    singlem: "envs/singlem.yml"
+    graftm: "envs/graftm.yml"

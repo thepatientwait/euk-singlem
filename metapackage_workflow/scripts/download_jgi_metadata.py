@@ -42,6 +42,8 @@ with open(snakemake.output.json, 'w') as f:
 response = requests.get(snakemake.params.meta_url)
 response.raise_for_status()
 with open(snakemake.output.meta, 'wb') as f:
-    f.write(response.content)
+    # replace '##' and '#' with 'number' in the header
+    content = response.content.decode('latin-1').replace('##', 'number').replace('#', 'number')
+    f.write(content.encode('latin-1')) 
 
 logger.info("Downloaded %s total organisms", len(json_data['organisms']))

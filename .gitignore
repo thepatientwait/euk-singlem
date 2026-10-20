@@ -12,6 +12,7 @@
 /test/singlem_output/
 /update_metapackage_output/
 /metapackage_workflow/test/test.fasta
+/metapackage_workflow/test/Coolia_malayensis_transcripts.fasta
 
 # Databases and downloaded reference data
 **/db/
@@ -53,15 +54,26 @@ backup/
 **/build/
 **/wget-log
 **/download-group?flt=
-**/phylorank.log
+/tree_workflow/balst.txt
 
-# Local machine and editor files
+# Credentials — never commit these
+**/secrets.yaml
+**/*_token
+**/*.token
 .env
 .env.*
 !.env.example
+
+# Logs
+**/*.log
+
+# Editor and OS files
 .DS_Store
 .vscode/
 .idea/
+*.swp
+*~
+*.bak
 
 # Independent repositories managed separately
 /benchmarking_workflow/

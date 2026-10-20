@@ -29,7 +29,7 @@ TAXONOMY_OTU        = snakemake.output['taxonomy_otu']
 # functions
 # ---------
 UNKNOWN_TAXONOMY = (
-    "d__Eukaryota; p__unclassified; c__unclassified; "
+    "d__Eukarya; p__unclassified; c__unclassified; "
     "o__unclassified; f__unclassified; g__unclassified; s__unclassified"
 )
 
