@@ -19,25 +19,39 @@ GENERATE_PATHS    = config["generate"]
 DOWNLOAD_SNAKEFILE = SUBWORKFLOWS_DIR / "download_data.smk"
 GENERATE_SNAKEFILE = SUBWORKFLOWS_DIR / "generate_metapackage.smk"
 
-PHASE1_DONE = Path(DOWNLOAD_PATHS["done_flag"])
-PHASE2_DONE = Path(GENERATE_PATHS["done_flag"])
-
-# Create done-flag parent directories once at parse time.
-os.makedirs(PHASE1_DONE.parent, exist_ok=True)
-os.makedirs(PHASE2_DONE.parent, exist_ok=True)
-
 ORCH_CFG         = config.get("orchestration", {})
 PROFILE          = ORCH_CFG.get("profile", "~/git/hpc_scripts/snakemake_configs/aqua")
 USE_CONDA        = bool(ORCH_CFG.get("use_conda", True))
 RERUN_INCOMPLETE = bool(ORCH_CFG.get("rerun_incomplete", True))
 EXTRA_ARGS       = ORCH_CFG.get("extra_args", "")
-DRYRUN_MODE      = bool(ORCH_CFG.get("dryrun_mode", False))
 
-# dryrun
+# Dry-run the subworkflows: `--config dryrun=true` (or orchestration.dryrun_mode: true,
+# as in config/dryrun.yaml). Each phase runs `snakemake --dry-run`, its output goes to
+# outputs/orchestration/dryrun/<phase>.log, and the real done-flags are left alone.
+def _truthy(value):
+    return str(value).strip().lower() in ("1", "true", "yes", "y")
+
+DRYRUN_MODE = _truthy(config.get("dryrun", ORCH_CFG.get("dryrun_mode", False)))
+DRYRUN_DIR  = Path("outputs/orchestration/dryrun")
+
+PHASE1_DONE = Path(DOWNLOAD_PATHS["done_flag"])
+PHASE2_DONE = Path(GENERATE_PATHS["done_flag"])
+
 if DRYRUN_MODE:
+    # Scratch done-flags so a dry run never marks a phase as complete; they are cleared
+    # on every start so both phases always re-plan.
+    if "dryrun" not in PHASE1_DONE.parts:
+        PHASE1_DONE = DRYRUN_DIR / PHASE1_DONE.name
+    if "dryrun" not in PHASE2_DONE.parts:
+        PHASE2_DONE = DRYRUN_DIR / PHASE2_DONE.name
     for done_flag in (PHASE1_DONE, PHASE2_DONE):
         if done_flag.exists():
             done_flag.unlink()
+
+# Create done-flag parent directories once at parse time.
+os.makedirs(PHASE1_DONE.parent, exist_ok=True)
+os.makedirs(PHASE2_DONE.parent, exist_ok=True)
+DRYRUN_PHASE_LOG = lambda phase: str(PHASE1_DONE.parent / f"{phase}.dryrun.log")
 
 # resources
 COMMON_FLAGS = ""
@@ -64,6 +78,8 @@ def build_common_flags():
     ]
     if cli_config:
         flags.append("--config " + " ".join(cli_config))
+    if DRYRUN_MODE and "--dry-run" not in EXTRA_ARGS and "-n" not in EXTRA_ARGS.split():
+        flags.append("--dry-run")
     if EXTRA_ARGS:
         flags.append(EXTRA_ARGS)
     return " ".join(flags)
@@ -97,10 +113,11 @@ rule run_download_subworkflow:
         workdir   = str(ROOT),
         cores     = get_workflow_cores(),
         flags     = COMMON_FLAGS,
-        snakemake = SNAKEMAKE_CMD
+        snakemake = SNAKEMAKE_CMD,
+        tee       = lambda wildcards: f"| tee {shlex.quote(DRYRUN_PHASE_LOG('download'))}" if DRYRUN_MODE else ""
     shell:
         """
-        {params.snakemake} --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags}
+        {params.snakemake} --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags} 2>&1 {params.tee}
         touch {output.done}
         """
 
@@ -115,9 +132,10 @@ rule run_generate_subworkflow:
         workdir   = str(ROOT),
         cores     = get_workflow_cores(),
         flags     = COMMON_FLAGS,
-        snakemake = SNAKEMAKE_CMD
+        snakemake = SNAKEMAKE_CMD,
+        tee       = lambda wildcards: f"| tee {shlex.quote(DRYRUN_PHASE_LOG('generate'))}" if DRYRUN_MODE else ""
     shell:
         """
-        {params.snakemake} --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags}
+        {params.snakemake} --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags} 2>&1 {params.tee}
         touch {output.done}
         """

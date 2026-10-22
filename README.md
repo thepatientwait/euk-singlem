@@ -50,6 +50,11 @@ Notes:
   `snakemake` call. `--config key=value` overrides are forwarded to both phases. Each
   phase is skipped once its done-flag (`outputs/orchestration/*.done`) exists; delete a
   flag to force that phase to re-run.
+- `--config dryrun=true` runs both phases as `snakemake --dry-run` instead (the same
+  as `config/dryrun.yaml`). Each phase's plan is written to
+  `outputs/orchestration/dryrun/{download,generate}.dryrun.log`, and the real
+  done-flags are not touched. Phase 2 is planned from the current state of the
+  outputs, so it does not include jobs that phase 1 would create.
 - The NCBI/P10K/JGI sources are consolidated by `scripts/build_unified_manifest.py`;
   `scripts/ncbi_taxid_resolver.py` and `scripts/fetch_ncbi_taxonomy.py` resolve
   taxonomy (Datasets API with Entrez fallback for replaced/suppressed assemblies).
