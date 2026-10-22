@@ -1,13 +1,17 @@
 import os
 import shlex
+import sys
 from pathlib import Path
 
 # config
 # ------
-configfile: "config.yaml"
-configfile: "paths.yaml"
-
 ROOT              = Path(workflow.basedir).resolve()
+CONFIG_DIR        = ROOT / "config"
+
+configfile: str(CONFIG_DIR / "config.yaml")
+configfile: str(CONFIG_DIR / "paths.yaml")
+configfile: str(CONFIG_DIR / "secrets.yaml")
+
 SUBWORKFLOWS_DIR  = ROOT / "subworkflows"
 DOWNLOAD_PATHS    = config["download"]
 GENERATE_PATHS    = config["generate"]
@@ -53,12 +57,23 @@ def build_common_flags():
         flags.append("--use-conda")
     if RERUN_INCOMPLETE:
         flags.append("--rerun-incomplete")
+    # forward `--config key=value` given on the command line (e.g. pixi_envs_dir=...)
+    # so the nested workflows see the same overrides as this one
+    cli_config = [
+        f"{key}={shlex.quote(str(value))}" for key, value in workflow.config_settings.overwrite_config.items()
+    ]
+    if cli_config:
+        flags.append("--config " + " ".join(cli_config))
     if EXTRA_ARGS:
         flags.append(EXTRA_ARGS)
     return " ".join(flags)
 
 
 COMMON_FLAGS = build_common_flags()
+
+# Run the nested workflows with the same snakemake as this one (the pixi default env),
+# so it works whether or not the caller used `pixi run`.
+SNAKEMAKE_CMD = f"{shlex.quote(sys.executable)} -m snakemake"
 
 localrules:
     all,
@@ -81,10 +96,11 @@ rule run_download_subworkflow:
         snakefile = str(DOWNLOAD_SNAKEFILE),
         workdir   = str(ROOT),
         cores     = get_workflow_cores(),
-        flags     = COMMON_FLAGS
+        flags     = COMMON_FLAGS,
+        snakemake = SNAKEMAKE_CMD
     shell:
         """
-        snakemake --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags}
+        {params.snakemake} --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags}
         touch {output.done}
         """
 
@@ -98,9 +114,10 @@ rule run_generate_subworkflow:
         snakefile = str(GENERATE_SNAKEFILE),
         workdir   = str(ROOT),
         cores     = get_workflow_cores(),
-        flags     = COMMON_FLAGS
+        flags     = COMMON_FLAGS,
+        snakemake = SNAKEMAKE_CMD
     shell:
         """
-        snakemake --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags}
+        {params.snakemake} --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags}
         touch {output.done}
         """

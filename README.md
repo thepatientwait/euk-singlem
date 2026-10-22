@@ -45,11 +45,13 @@ Notes:
   ```yaml
   jgi_token: "Bearer <token>"
   ```
-- `metapackage_workflow/snakefile` is a legacy top-level entrypoint that still
-  points at the old root-level `config.yaml`/`paths.yaml`. Run the subworkflows
-  above instead.
+- `metapackage_workflow/snakefile` is an orchestrator that runs the two phases above
+  in order (`pixi run snakemake --profile ... --use-conda`), each as a nested
+  `snakemake` call. `--config key=value` overrides are forwarded to both phases. Each
+  phase is skipped once its done-flag (`outputs/orchestration/*.done`) exists; delete a
+  flag to force that phase to re-run.
 - The NCBI/P10K/JGI sources are consolidated by `scripts/build_unified_manifest.py`;
-  `scripts/ncbi_taxid_resolver.py` and `scripts/fetch_ncbi_taxonomy_v2.py` resolve
+  `scripts/ncbi_taxid_resolver.py` and `scripts/fetch_ncbi_taxonomy.py` resolve
   taxonomy (Datasets API with Entrez fallback for replaced/suppressed assemblies).
 
 ### tree_workflow
