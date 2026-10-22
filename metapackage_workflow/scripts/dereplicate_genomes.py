@@ -47,10 +47,6 @@ def _run_coverm_cluster(
     threads: int,
 ) -> None:
     cmd = [
-        "pixi",
-        "run",
-        "-e",
-        "coverm",
         "coverm",
         "cluster",
         "--genome-fasta-list",

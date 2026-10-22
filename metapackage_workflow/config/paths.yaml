@@ -127,6 +127,3 @@ common:
   busco_hmm:
     dir: "busco_downloads/lineages/eukaryota_odb12/hmms"
     file: "busco_downloads/lineages/eukaryota_odb12/hmms/{busco_gene}.hmm"
-  environments:
-    singlem: "envs/singlem.yml"
-    graftm: "envs/graftm.yml"

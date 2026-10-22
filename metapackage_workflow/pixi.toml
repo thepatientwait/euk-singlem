@@ -1,51 +1,60 @@
 [workspace]
-channels = ["conda-forge", "bioconda", "nclibz"]
-name = "DeepOceanEukaryotes"
+name = "euk-singlem-metapackage"
+channels = ["conda-forge", "bioconda"]
 platforms = ["linux-64"]
 
-[environments]
-default = ["main"]
-phylofisher = ["phylofisher"]
-barrnap = ["barrnap"]
-trnascan = ["trnascan"]
-isiteuk = ["isiteuk"]
-coverm = ["coverm"]
+# Snakemake (9.x) has no native pixi support, but its `conda:` directive accepts the path
+# of an existing environment directory. Each rule group below gets its own environment at
+# .pixi/envs/<name>; rules reference them via `env("<name>")` in the snakefiles
+# (subworkflows/*.smk).
+#
+#   pixi install --all      # create/update every environment (needs network)
+#   pixi run snakemake -c8  # run the workflow (driver = default env)
 
-[feature.main.dependencies]
-python = ">=3.8"
-biopython = "*"
-extern = "*"
-bird_tool_utils_python = "*"
-snakemake = ">=8"
-snakemake-executor-plugin-cluster-generic = ">=1"
+[dependencies]            # default env: the snakemake driver (also runs every rule without a `conda:`)
+python = "3.12.*"
+snakemake = ">=9.0"
+snakemake-executor-plugin-cluster-generic = "*"
 polars = "*"
-xlsx2csv = "*"
+pyyaml = "*"
+pandas = "*"
+biopython = "*"
+joblib = "*"
+requests = "*"
+certifi = "*"
+tqdm = "*"
+ncbi-datasets-cli = "*"   # download_genome.py, fetch_ncbi_taxonomy.py
+[pypi-dependencies]
+jq = "*"                  # helpers.py parses the JGI json with the python jq bindings
 
-[feature.phylofisher.dependencies]
-phylofisher = "*"
-mamba = "*"
-peewee = "*"
+[activation]
+# snakemake activates rule environments through conda's `activate`
+env = { PATH = "/mnt/weka/pkg/cmr/sw/conda/condabin:$PATH" }
 
-[feature.phylofisher.activation]
-env = { PHYLOFISHER_DB = "/work/microbiome/users/aroneys/db/phylofisher/1.2.14/PhyloFisherDatabase_v1.0/database" }
+# SingleM create / regenerate / chainsaw and the off-target HMM searches
+[feature.singlem.dependencies]
+python = "3.12.*"
+singlem = ">=0.19.0"
+hmmer = "*"
+parallel = ">=20240122"
+polars = "*"
+biopython = "*"
 
-[feature.phylofisher.tasks]
-snakemake_local = "PYTHONPATH=/home/aroneys/src/PhyloFisher snakemake"
+[feature.graftm.dependencies]
+graftm = "*"
 
-[feature.barrnap.dependencies]
-pybarrnap = "==0.5.1"
+# BUSCO runs (run_busco, init_busco_lineage_cache)
+[feature.busco.dependencies]
+python = "3.12.*"
+busco = ">=5"
 
-[feature.trnascan.dependencies]
-"trnascan-se" = "==2.0.12"
-
-[feature.isiteuk.dependencies]
-python = ">=3.7,<3.12"
-singlem = ">=0.16.0"
-polars = "0.20.*"
-diamond = ">=2.1.7,<2.1.11"
-
-[feature.isiteuk.tasks]
-isiteuk = "PATH=/home/aroneys/src/singlem/bin:$PATH PYTHONPATH=/home/aroneys/src/singlem TMPDIR=/work/microbiome/ibis/deep_ocean/results/isiteuk /home/aroneys/src/isiteuk/bin/isiteuk"
-
+# genome dereplication (dereplicate_genomes calls `coverm cluster`)
 [feature.coverm.dependencies]
 coverm = "0.7.*"
+
+[environments]
+default = { solve-group = "all" }
+singlem = { features = ["singlem"], no-default-feature = true }
+graftm  = { features = ["graftm"],  no-default-feature = true }
+busco   = { features = ["busco"],   no-default-feature = true }
+coverm  = { features = ["coverm"],  no-default-feature = true }

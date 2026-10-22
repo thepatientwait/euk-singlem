@@ -18,6 +18,7 @@ from helpers import (
     collect_final_packages_factory,
     create_resource_profile_factory,
     get_genomes_with_transcripts_factory,
+    pixi_env,
 )
 
 
@@ -37,8 +38,23 @@ OFF_TARGET   = SINGLEM.get("off_target", {})
 OFF_TARGET_CONFIG = config["singlem"].get("off_target", {})
 OFF_TARGET_ENABLED = OFF_TARGET_CONFIG.get("enabled", False)
 OFF_TARGET_INPUT = OFF_TARGET["input"]
-SINGLEM_ENV  = (ROOT / COMMON["environments"]["singlem"]).resolve()
-GRAFTM_ENV   = (ROOT / COMMON["environments"]["graftm"]).resolve()
+
+# one pixi environment per group of similar rules (see pixi.toml); override the
+# location with `--config pixi_envs_dir=/path` if pixi uses detached environments
+PIXI_ENVS_USED = {}
+
+
+def env(name):
+    PIXI_ENVS_USED[name] = pixi_env(ROOT, name, config.get("pixi_envs_dir"), check=False)
+    return PIXI_ENVS_USED[name]
+
+
+onstart:
+    # a missing env directory would otherwise be mistaken for an env *name* by snakemake
+    if not workflow.dryrun:
+        for _name in PIXI_ENVS_USED:
+            pixi_env(ROOT, _name, config.get("pixi_envs_dir"))
+
 
 # resources
 BASE_MEM_MB    = config["resources"]["base_mem_mb"]
@@ -144,6 +160,8 @@ rule init_busco_lineage_cache:
         download_path = BUSCO_DOWNLOAD_PATH
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    conda:
+        env("busco")
     shell:
         """
         mkdir -p {params.download_path}
@@ -174,6 +192,8 @@ rule run_busco:
     resources: **BUSCO_RESOURCES
     wildcard_constraints:
         group = "|".join(BUSCO_GROUPS)
+    conda:
+        env("busco")
     script:
         str(SCRIPTS_DIR / "run_busco.py")
 
@@ -242,7 +262,7 @@ if DEREP_ENABLED:
         retries: TOTAL_ATTEMPTS
         resources: **RESOURCE_PROFILE(mem_scale=50, runtime="4h")
         conda:
-            str(SINGLEM_ENV)
+            env("coverm")
         script:
             str(SCRIPTS_DIR / "dereplicate_genomes.py")
 
@@ -287,7 +307,7 @@ rule graftm_create:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=2.0)
     conda:
-        str(GRAFTM_ENV)
+        env("graftm")
     shell:
         "graftM create --min_aligned_percent 0 --force "
         "--sequences {input.aa_sequences_file} "
@@ -307,7 +327,7 @@ rule singlem_seqs:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     shell:
         "singlem seqs "
         "--alignment {input.alignment} "
@@ -327,7 +347,7 @@ rule singlem_create:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=0.5, runtime="1h")
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     shell:
         "singlem create "
         "--input-graftm-package {input.gpkg} "
@@ -348,7 +368,7 @@ rule singlem_chainsaw:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     shell:
         "singlem chainsaw "
         "--input-singlem-package {input.spkg} "
@@ -366,7 +386,7 @@ rule acquire_and_concat_hmms:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     script:
         str(SCRIPTS_DIR / "acquire_and_concat_hmms.py")
 
@@ -388,7 +408,7 @@ rule prepare_off_target_per_genome:
     wildcard_constraints:
         off_target_id = "[A-Za-z0-9._-]+"
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     script:
         str(SCRIPTS_DIR / "prepare_off_target_per_genome.py")
 
@@ -409,7 +429,7 @@ rule gather_off_target_sequences:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=1.5, runtime="2h")
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     script:
         str(SCRIPTS_DIR / "gather_off_target_sequences.py")
 
@@ -425,7 +445,7 @@ rule off_target_dup_rename:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     script:
         str(SCRIPTS_DIR / "rename_off_target_dups.py")
 
@@ -445,7 +465,7 @@ rule singlem_regenerate:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=4.0, runtime="2h")
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     script:
         str(SCRIPTS_DIR / "regenerate_singlem_with_off_target.py")
 
@@ -474,7 +494,7 @@ rule create_draft_metapackage:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=4.0, runtime="8h")
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     shell:
         "singlem metapackage "
         "--singlem-packages {input.final_packages} "
@@ -509,7 +529,7 @@ rule eukaryotic_transcripts:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     shell:
         "singlem pipe "
         "--sequences {input.transcripts} "
@@ -543,7 +563,7 @@ rule aggregate_transcript_taxonomy:
     threads: 1
     retries: TOTAL_ATTEMPTS
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     resources: **DEFAULT_RESOURCES
     shell:
         """
@@ -570,7 +590,7 @@ rule make_nucleotide_sdb:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=2.0, runtime="2h")
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     shell:
         "singlem makedb "
         "--otu-table {input.otu_table} "
@@ -589,7 +609,7 @@ rule create_final_metapackage:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=8.0, runtime="8h")
     conda:
-        str(SINGLEM_ENV)
+        env("singlem")
     shell:
         "singlem metapackage "
         "--singlem-packages {input.final_packages} "
