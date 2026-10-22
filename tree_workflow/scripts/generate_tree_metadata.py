@@ -4,6 +4,11 @@ from pathlib import Path
 
 import polars as pl
 
+from log_redirect import redirect_to_snakemake_log
+
+# send this rule's stdout/stderr to its log: file
+redirect_to_snakemake_log()
+
 RANKS = ["domain", "phylum", "class", "order", "family", "genus", "species"]
 PREFIXES = {
     "domain": "d__",

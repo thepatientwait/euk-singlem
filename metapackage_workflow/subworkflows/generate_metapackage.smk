@@ -18,6 +18,7 @@ from helpers import (
     collect_final_packages_factory,
     create_resource_profile_factory,
     get_genomes_with_transcripts_factory,
+    log_path,
     pixi_env,
 )
 
@@ -160,10 +161,13 @@ rule init_busco_lineage_cache:
         download_path = BUSCO_DOWNLOAD_PATH
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("init_busco_lineage_cache")
     conda:
         env("busco")
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p {params.download_path}
         mkdir -p $(dirname {output.ready_marker})
         if [ ! -s {params.download_path}/file_versions.tsv ] || [ ! -d {params.download_path}/lineages/{params.lineage} ]; then
@@ -192,6 +196,8 @@ rule run_busco:
     resources: **BUSCO_RESOURCES
     wildcard_constraints:
         group = "|".join(BUSCO_GROUPS)
+    log:
+        log_path("run_busco", "group", "genome_acc")
     conda:
         env("busco")
     script:
@@ -209,6 +215,8 @@ rule busco_results_quality_control:
         use_multi_copy = config["busco"]["quality_control"].get("use_multi_copy", False)
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("busco_results_quality_control")
     script:
         str(SCRIPTS_DIR / "busco_results_quality_control.py")
 
@@ -241,6 +249,8 @@ rule build_checkm2_quality_report:
     resources:
         mem_mb = get_mem_mb(BASE_MEM_MB),
         runtime = get_runtime(BASE_RUNTIME),
+    log:
+        log_path("build_checkm2_quality_report")
     script:
         str(SCRIPTS_DIR / "build_checkm2_quality_report.py")
 
@@ -261,6 +271,8 @@ if DEREP_ENABLED:
         threads: config["resources"]["coverm_cluster_threads"]
         retries: TOTAL_ATTEMPTS
         resources: **RESOURCE_PROFILE(mem_scale=50, runtime="4h")
+        log:
+            log_path("dereplicate_genomes")
         conda:
             env("coverm")
         script:
@@ -289,6 +301,8 @@ checkpoint aggregate_busco_sequences:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     threads: 16
+    log:
+        log_path("aggregate_busco_sequences")
     script:
         str(SCRIPTS_DIR / "aggregate_busco_sequences.py")
 
@@ -306,9 +320,12 @@ rule graftm_create:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=2.0)
+    log:
+        log_path("graftm_create", "busco_gene")
     conda:
         env("graftm")
     shell:
+        "exec > {log} 2>&1; "
         "graftM create --min_aligned_percent 0 --force "
         "--sequences {input.aa_sequences_file} "
         "--hmm {params.hmm_path} "
@@ -326,9 +343,12 @@ rule singlem_seqs:
         window_position_file = SINGLEM["windows"]["positions"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("singlem_seqs", "busco_gene")
     conda:
         env("singlem")
     shell:
+        "exec > {log} 2>&1; "
         "singlem seqs "
         "--alignment {input.alignment} "
         "--alignment-type aa > {output.window_position_file}"
@@ -346,9 +366,12 @@ rule singlem_create:
         target_domains = config["singlem"]["target_domains"]
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=0.5, runtime="1h")
+    log:
+        log_path("singlem_create", "busco_gene")
     conda:
         env("singlem")
     shell:
+        "exec > {log} 2>&1; "
         "singlem create "
         "--input-graftm-package {input.gpkg} "
         "--output {output.spkg} "
@@ -367,9 +390,12 @@ rule singlem_chainsaw:
         chainsaw_spkg = directory(SINGLEM["packages"]["final_spkg"])
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("singlem_chainsaw", "busco_gene")
     conda:
         env("singlem")
     shell:
+        "exec > {log} 2>&1; "
         "singlem chainsaw "
         "--input-singlem-package {input.spkg} "
         "--output-singlem-package {output.chainsaw_spkg}"
@@ -385,6 +411,8 @@ rule acquire_and_concat_hmms:
         done = SINGLEM["off_target"]["hmms"]["done"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("acquire_and_concat_hmms")
     conda:
         env("singlem")
     script:
@@ -407,6 +435,8 @@ rule prepare_off_target_per_genome:
     resources: **RESOURCE_PROFILE(mem_scale=1.0, runtime="2h")
     wildcard_constraints:
         off_target_id = "[A-Za-z0-9._-]+"
+    log:
+        log_path("prepare_off_target_per_genome", "off_target_id")
     conda:
         env("singlem")
     script:
@@ -428,6 +458,8 @@ rule gather_off_target_sequences:
         default_taxonomy = OFF_TARGET_CONFIG.get("default_taxonomy", "d__Bacteria")
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=1.5, runtime="2h")
+    log:
+        log_path("gather_off_target_sequences")
     conda:
         env("singlem")
     script:
@@ -444,6 +476,8 @@ rule off_target_dup_rename:
         taxonomy = SINGLEM["off_target"]["prepare"]["taxonomy"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("off_target_dup_rename", "busco_gene")
     conda:
         env("singlem")
     script:
@@ -464,6 +498,8 @@ rule singlem_regenerate:
         sequence_prefix = "{busco_gene}~"
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=4.0, runtime="2h")
+    log:
+        log_path("singlem_regenerate", "busco_gene")
     conda:
         env("singlem")
     script:
@@ -479,6 +515,8 @@ checkpoint filter_invalid_singlem_packages:
         invalid_packages_report = SINGLEM["metapackages"]["invalid_packages_report"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("filter_invalid_singlem_packages")
     script:
         str(SCRIPTS_DIR / "filter_invalid_singlem_packages.py")
 
@@ -493,9 +531,12 @@ rule create_draft_metapackage:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=4.0, runtime="8h")
+    log:
+        log_path("create_draft_metapackage")
     conda:
         env("singlem")
     shell:
+        "exec > {log} 2>&1; "
         "singlem metapackage "
         "--singlem-packages {input.final_packages} "
         "--no-nucleotide-sdb "
@@ -514,6 +555,8 @@ rule extract_transcripts:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("extract_transcripts", "group", "genome_acc")
     script:
         str(SCRIPTS_DIR / "extract_busco_transcripts.py")
 
@@ -528,9 +571,12 @@ rule eukaryotic_transcripts:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("eukaryotic_transcripts", "group", "genome_acc")
     conda:
         env("singlem")
     shell:
+        "exec > {log} 2>&1; "
         "singlem pipe "
         "--sequences {input.transcripts} "
         "--metapackage {input.draft_metapackage} "
@@ -549,6 +595,8 @@ rule assign_eukaryotic_taxonomy:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("assign_eukaryotic_taxonomy", "group", "genome_acc")
     script:
         str(SCRIPTS_DIR / "assign_eukaryotic_taxonomy.py")
 
@@ -562,11 +610,14 @@ rule aggregate_transcript_taxonomy:
         combined_otu = TRANSCRIPTS["aggregate"]["combined_otu"]
     threads: 1
     retries: TOTAL_ATTEMPTS
+    log:
+        log_path("aggregate_transcript_taxonomy")
     conda:
         env("singlem")
     resources: **DEFAULT_RESOURCES
     shell:
         """
+        exec > {log} 2>&1
         tables=({input.taxonomy_tables})
         if [ ${{#tables[@]}} -eq 0 ]; then
             echo "No transcript taxonomy tables discovered from QC-passing BUSCO genomes." >&2
@@ -589,9 +640,12 @@ rule make_nucleotide_sdb:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=2.0, runtime="2h")
+    log:
+        log_path("make_nucleotide_sdb")
     conda:
         env("singlem")
     shell:
+        "exec > {log} 2>&1; "
         "singlem makedb "
         "--otu-table {input.otu_table} "
         "--db {output.sdb} "
@@ -608,9 +662,12 @@ rule create_final_metapackage:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=8.0, runtime="8h")
+    log:
+        log_path("create_final_metapackage")
     conda:
         env("singlem")
     shell:
+        "exec > {log} 2>&1; "
         "singlem metapackage "
         "--singlem-packages {input.final_packages} "
         "--nucleotide-sdb {input.sdb} "

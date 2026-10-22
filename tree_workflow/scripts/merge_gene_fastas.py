@@ -2,6 +2,11 @@
 
 from pathlib import Path
 
+from log_redirect import redirect_to_snakemake_log
+
+# send this rule's stdout/stderr to its log: file
+redirect_to_snakemake_log()
+
 
 def append_if_exists(path: Path, handle) -> None:
     if not path.exists() or path.stat().st_size == 0:

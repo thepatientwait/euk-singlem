@@ -6,6 +6,11 @@ from collections import defaultdict, Counter
 import dendropy
 import polars as pl
 
+from log_redirect import redirect_to_snakemake_log
+
+# send this rule's stdout/stderr to its log: file
+redirect_to_snakemake_log()
+
 RANKS = ["domain", "phylum", "class", "order", "family", "genus", "species"]
 PREFIXES = {r: f"{r[0]}__" for r in RANKS}
 

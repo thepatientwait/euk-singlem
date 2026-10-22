@@ -24,6 +24,8 @@ from helpers import (
     get_on_disk_genome_paths,
     get_genome_name,
     get_p10k_genome_url,
+    log_path,
+    redirect_to_log,
     write_genome_manifest_nls,
 )
 
@@ -76,6 +78,8 @@ checkpoint download_jgi_metadata:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("download_jgi_metadata", "group")
     script:
         str(SCRIPTS_DIR / "download_jgi_metadata.py")
 
@@ -96,6 +100,8 @@ rule download_jgi_genome:
     resources: **DEFAULT_RESOURCES
     wildcard_constraints:
         group = "|".join(GROUPS)
+    log:
+        log_path("download_jgi_genome", "group", "genome_acc")
     script:
         str(SCRIPTS_DIR / "download_jgi_genome.py")
 
@@ -108,6 +114,8 @@ checkpoint download_p10k_metadata:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("download_p10k_metadata")
     script:
         str(SCRIPTS_DIR / "download_p10k_metadata.py")
 
@@ -126,6 +134,8 @@ checkpoint discover_ncbi_genomes:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("discover_ncbi_genomes")
     script:
         str(SCRIPTS_DIR / "discover_ncbi_genomes.py")
 
@@ -144,6 +154,8 @@ rule build_unified_manifest:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("build_unified_manifest")
     script:
         str(SCRIPTS_DIR / "build_unified_manifest.py")
 
@@ -159,6 +171,8 @@ rule download_ncbi_genome:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("download_ncbi_genome", "genome_acc")
     script:
         str(SCRIPTS_DIR / "download_genome.py")
 
@@ -174,6 +188,8 @@ rule download_discovered_ncbi_genome:
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("download_discovered_ncbi_genome", "genome_acc")
     script:
         str(SCRIPTS_DIR / "download_genome.py")
 
@@ -187,6 +203,8 @@ rule fetch_ncbi_taxonomy:
         email = config["ncbi"]["email"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("fetch_ncbi_taxonomy")
     script:
         str(SCRIPTS_DIR / "fetch_ncbi_taxonomy_v2.py")
 
@@ -256,77 +274,80 @@ rule cleanup_failed_genomes:
         done   = CLEANUP["done_flag"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("cleanup_failed_genomes")
     run:
-        import struct
-        from pathlib import Path
-        from tqdm import tqdm
+        with redirect_to_log(log[0]):
+            import struct
+            from pathlib import Path
+            from tqdm import tqdm
 
-        from scripts.log_config import configure_logger
+            from scripts.log_config import configure_logger
 
-        logger_name = os.path.splitext(os.path.basename(__file__))[0]
-        logger = configure_logger(logger_name)
+            logger_name = os.path.splitext(os.path.basename(__file__))[0]
+            logger = configure_logger(logger_name)
 
 
 
-        def has_valid_gzip_eof(genome_path):
-            if not genome_path.exists():
-                return None
+            def has_valid_gzip_eof(genome_path):
+                if not genome_path.exists():
+                    return None
             
-            file_size = genome_path.stat().st_size
-            reason = None
+                file_size = genome_path.stat().st_size
+                reason = None
             
-            # Check for empty file or a file too small to contain a gzip header (10 bytes) + trailer (8 bytes)
-            if file_size < 18:
-                reason = "empty_or_truncated_file"
-            else:
-                try:
-                    with open(genome_path, "rb") as f:
-                        print(f"Checking {genome_path} (size: {file_size} bytes)")
-                        # 1. Check magic header (first 2 bytes)
-                        if f.read(2) != b"\x1f\x8b":
-                            reason = "invalid_header"
-                        else:
-                            # 2. Check EOF trailer (last 8 bytes)
-                            f.seek(-8, 2)
-                            trailer = f.read(8)
-                            if len(trailer) < 8:
-                                reason = "truncated_trailer"
+                # Check for empty file or a file too small to contain a gzip header (10 bytes) + trailer (8 bytes)
+                if file_size < 18:
+                    reason = "empty_or_truncated_file"
+                else:
+                    try:
+                        with open(genome_path, "rb") as f:
+                            print(f"Checking {genome_path} (size: {file_size} bytes)")
+                            # 1. Check magic header (first 2 bytes)
+                            if f.read(2) != b"\x1f\x8b":
+                                reason = "invalid_header"
                             else:
-                                # Unpack CRC32 and original size (little-endian unsigned 32-bit ints)
-                                crc32, uncompressed_size = struct.unpack("<II", trailer)
-                except (OSError, IOError):
-                    reason = "read_error"
+                                # 2. Check EOF trailer (last 8 bytes)
+                                f.seek(-8, 2)
+                                trailer = f.read(8)
+                                if len(trailer) < 8:
+                                    reason = "truncated_trailer"
+                                else:
+                                    # Unpack CRC32 and original size (little-endian unsigned 32-bit ints)
+                                    crc32, uncompressed_size = struct.unpack("<II", trailer)
+                    except (OSError, IOError):
+                        reason = "read_error"
             
-            if reason:
-                genome_acc = genome_path.name.replace(".fasta.gz", "")
-                group = genome_path.parent.name
-                return (group, genome_acc, str(genome_path), reason)
+                if reason:
+                    genome_acc = genome_path.name.replace(".fasta.gz", "")
+                    group = genome_path.parent.name
+                    return (group, genome_acc, str(genome_path), reason)
             
-            return None
+                return None
 
-        report_path = Path(output.report)
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        # Validate everything on disk (already-present genomes are not rule inputs).
-        # Failures are only reported, never deleted: zero-byte files stay in place as
-        # markers so they are not re-requested on every run.
-        genome_paths_to_check = get_on_disk_genome_paths(GROUPS)
-        logger.info(f"[cleanup_failed_genomes] Checking {len(genome_paths_to_check)} genome files for validity...")
+            report_path = Path(output.report)
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            # Validate everything on disk (already-present genomes are not rule inputs).
+            # Failures are only reported, never deleted: zero-byte files stay in place as
+            # markers so they are not re-requested on every run.
+            genome_paths_to_check = get_on_disk_genome_paths(GROUPS)
+            logger.info(f"[cleanup_failed_genomes] Checking {len(genome_paths_to_check)} genome files for validity...")
 
-        removed_rows = []
-        # for genome_path in tqdm(sorted([Path(p) for p in input.genomes]), desc="Checking genome files"):
-        for genome_path in sorted(Path(p) for p in genome_paths_to_check):
-            res = has_valid_gzip_eof(genome_path)
-            if res:
-                group, genome_acc, genome_path_str, reason = res
-                # genome_path.unlink()
-                removed_rows.append((group, genome_acc, genome_path_str, reason))
+            removed_rows = []
+            # for genome_path in tqdm(sorted([Path(p) for p in input.genomes]), desc="Checking genome files"):
+            for genome_path in sorted(Path(p) for p in genome_paths_to_check):
+                res = has_valid_gzip_eof(genome_path)
+                if res:
+                    group, genome_acc, genome_path_str, reason = res
+                    # genome_path.unlink()
+                    removed_rows.append((group, genome_acc, genome_path_str, reason))
 
-        with open(report_path, "w", encoding="utf-8") as handle:
-            handle.write("group\tgenome_acc\tgenome_path\treason\n")
-            for group, genome_acc, genome_path, reason in removed_rows:
-                handle.write(f"{group}\t{genome_acc}\t{genome_path}\t{reason}\n")
+            with open(report_path, "w", encoding="utf-8") as handle:
+                handle.write("group\tgenome_acc\tgenome_path\treason\n")
+                for group, genome_acc, genome_path, reason in removed_rows:
+                    handle.write(f"{group}\t{genome_acc}\t{genome_path}\t{reason}\n")
 
-        Path(output.done).touch()
+            Path(output.done).touch()
 
 
 rule write_genome_manifest:
@@ -337,44 +358,47 @@ rule write_genome_manifest:
         manifest = MANIFEST["genome"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("write_genome_manifest")
     run:
-        import polars as pl
+        with redirect_to_log(log[0]):
+            import polars as pl
 
-        genome_paths = get_existing_genome_paths_from_metadata(GROUPS)
+            genome_paths = get_existing_genome_paths_from_metadata(GROUPS)
 
-        taxonomy_df = pl.read_csv(input.taxonomy, separator='\t')
-        if "acc" not in taxonomy_df.columns or "parsed_taxon_string" not in taxonomy_df.columns:
-            raise ValueError(
-                f"Taxonomy mapping file missing required columns: {input.taxonomy}"
-            )
-
-        taxonomy_exact = set(
-            taxonomy_df
-            .filter(pl.col("parsed_taxon_string").is_not_null() & (pl.col("parsed_taxon_string") != ""))
-            ["acc"]
-            .to_list()
-        )
-
-        valid_genome_paths = []
-        missing_taxonomy = []
-
-        for genome_path in genome_paths:
-            genome_acc = Path(genome_path).name.replace(".fasta.gz", "")
-
-            if genome_acc in taxonomy_exact:
-                valid_genome_paths.append(genome_path)
-            else:
-                missing_taxonomy.append(genome_acc)
-
-        if missing_taxonomy:
-            print(
-                "[write_genome_manifest] Excluding {} genomes without taxonomy mapping (examples: {}).".format(
-                    len(missing_taxonomy),
-                    ", ".join(sorted(missing_taxonomy)[:10]),
+            taxonomy_df = pl.read_csv(input.taxonomy, separator='\t')
+            if "acc" not in taxonomy_df.columns or "parsed_taxon_string" not in taxonomy_df.columns:
+                raise ValueError(
+                    f"Taxonomy mapping file missing required columns: {input.taxonomy}"
                 )
+
+            taxonomy_exact = set(
+                taxonomy_df
+                .filter(pl.col("parsed_taxon_string").is_not_null() & (pl.col("parsed_taxon_string") != ""))
+                ["acc"]
+                .to_list()
             )
 
-        if len(valid_genome_paths) == 0:
-            raise ValueError("No genomes have taxonomy mappings; cannot write manifest")
+            valid_genome_paths = []
+            missing_taxonomy = []
 
-        write_genome_manifest_nls(output.manifest, valid_genome_paths)
+            for genome_path in genome_paths:
+                genome_acc = Path(genome_path).name.replace(".fasta.gz", "")
+
+                if genome_acc in taxonomy_exact:
+                    valid_genome_paths.append(genome_path)
+                else:
+                    missing_taxonomy.append(genome_acc)
+
+            if missing_taxonomy:
+                print(
+                    "[write_genome_manifest] Excluding {} genomes without taxonomy mapping (examples: {}).".format(
+                        len(missing_taxonomy),
+                        ", ".join(sorted(missing_taxonomy)[:10]),
+                    )
+                )
+
+            if len(valid_genome_paths) == 0:
+                raise ValueError("No genomes have taxonomy mappings; cannot write manifest")
+
+            write_genome_manifest_nls(output.manifest, valid_genome_paths)

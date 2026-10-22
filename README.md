@@ -52,9 +52,15 @@ Notes:
   flag to force that phase to re-run.
 - `--config dryrun=true` runs both phases as `snakemake --dry-run` instead (the same
   as `config/dryrun.yaml`). Each phase's plan is written to
-  `outputs/orchestration/dryrun/{download,generate}.dryrun.log`, and the real
-  done-flags are not touched. Phase 2 is planned from the current state of the
-  outputs, so it does not include jobs that phase 1 would create.
+  `logs/orchestration/{download,generate}.dryrun.log`, and the real done-flags are not
+  touched. Phase 2 is planned from the current state of the outputs, so it does not
+  include jobs that phase 1 would create.
+- Every rule writes its stdout/stderr (including subprocess output) to a log in the
+  workflow directory via `log:`: `logs/<rule>/<wildcards>.log`, or `logs/<rule>.log`
+  for rules without wildcards. Logs are overwritten each time a job runs. The raw PBS
+  `.OU`/`.ER` files still go to `~/qsub_logs` (check those for jobs killed before they
+  wrote anything, e.g. out of memory).
+
 - The NCBI/P10K/JGI sources are consolidated by `scripts/build_unified_manifest.py`;
   `scripts/ncbi_taxid_resolver.py` and `scripts/fetch_ncbi_taxonomy.py` resolve
   taxonomy (Datasets API with Entrez fallback for replaced/suppressed assemblies).

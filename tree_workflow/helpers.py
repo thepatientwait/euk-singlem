@@ -1,3 +1,5 @@
+import logging
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -252,3 +254,34 @@ def pixi_env(workflow_dir, name, envs_dir=None, check=True):
             f"Dry runs (-n) skip this check."
         )
     return path.as_posix()
+
+
+def log_path(rule_name, *wildcards):
+    """Per-rule log file: ``logs/<rule>/<wildcards>.log`` (``logs/<rule>.log`` without wildcards).
+
+    Wildcards must be present in the rule's output. Every run of a job overwrites its log.
+    """
+    if not wildcards:
+        return f"logs/{rule_name}.log"
+    return f"logs/{rule_name}/" + "/".join("{" + w + "}" for w in wildcards) + ".log"
+
+
+@contextmanager
+def redirect_to_log(log_file):
+    """Send stdout, stderr and logging output of a ``run:`` block to ``log_file`` (overwritten).
+
+    Unlike the file-descriptor redirect used for ``script:`` rules this only swaps the Python
+    streams, because a ``run:`` block can execute inside the snakemake process itself.
+    """
+    path = Path(str(log_file))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", buffering=1) as handle:
+        handler = logging.StreamHandler(handle)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s"))
+        root = logging.getLogger()
+        root.addHandler(handler)
+        try:
+            with redirect_stdout(handle), redirect_stderr(handle):
+                yield handle
+        finally:
+            root.removeHandler(handler)

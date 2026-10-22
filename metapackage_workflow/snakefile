@@ -51,7 +51,11 @@ if DRYRUN_MODE:
 # Create done-flag parent directories once at parse time.
 os.makedirs(PHASE1_DONE.parent, exist_ok=True)
 os.makedirs(PHASE2_DONE.parent, exist_ok=True)
-DRYRUN_PHASE_LOG = lambda phase: str(PHASE1_DONE.parent / f"{phase}.dryrun.log")
+
+# Per-phase logs of the nested snakemake calls (overwritten on every run); dry-run plans go
+# to separate files so they never replace the log of a real run.
+def phase_log(phase):
+    return f"logs/orchestration/{phase}{'.dryrun' if DRYRUN_MODE else ''}.log"
 
 # resources
 COMMON_FLAGS = ""
@@ -108,16 +112,17 @@ rule all:
 rule run_download_subworkflow:
     output:
         done = str(PHASE1_DONE)
+    log:
+        phase_log("download")
     params:
         snakefile = str(DOWNLOAD_SNAKEFILE),
         workdir   = str(ROOT),
         cores     = get_workflow_cores(),
         flags     = COMMON_FLAGS,
-        snakemake = SNAKEMAKE_CMD,
-        tee       = lambda wildcards: f"| tee {shlex.quote(DRYRUN_PHASE_LOG('download'))}" if DRYRUN_MODE else ""
+        snakemake = SNAKEMAKE_CMD
     shell:
         """
-        {params.snakemake} --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags} 2>&1 {params.tee}
+        {params.snakemake} --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags} 2>&1 | tee {log}
         touch {output.done}
         """
 
@@ -127,15 +132,16 @@ rule run_generate_subworkflow:
         done = str(PHASE1_DONE)
     output:
         done = str(PHASE2_DONE)
+    log:
+        phase_log("generate")
     params:
         snakefile = str(GENERATE_SNAKEFILE),
         workdir   = str(ROOT),
         cores     = get_workflow_cores(),
         flags     = COMMON_FLAGS,
-        snakemake = SNAKEMAKE_CMD,
-        tee       = lambda wildcards: f"| tee {shlex.quote(DRYRUN_PHASE_LOG('generate'))}" if DRYRUN_MODE else ""
+        snakemake = SNAKEMAKE_CMD
     shell:
         """
-        {params.snakemake} --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags} 2>&1 {params.tee}
+        {params.snakemake} --snakefile {params.snakefile} --directory {params.workdir} --cores {params.cores} {params.flags} 2>&1 | tee {log}
         touch {output.done}
         """

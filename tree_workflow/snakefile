@@ -14,7 +14,9 @@ from helpers import (
     create_dirs,
     load_external_genome_map,
     load_valid_genes,
+    log_path,
     pixi_env,
+    redirect_to_log,
 )
 
 
@@ -146,21 +148,24 @@ rule build_external_manifest_table:
         table = EXTERNAL_PATHS["metadata"]["manifest_table"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("build_external_manifest_table")
     run:
-        out_path = Path(output.table)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with redirect_to_log(log[0]):
+            out_path = Path(output.table)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        rows = []
-        for genome_acc, genome_path in EXTERNAL_GENOME_MAP.items():
-            rows.append({"group": EXTERNAL_GROUP, "genome_acc": genome_acc, "genome_path": genome_path})
+            rows = []
+            for genome_acc, genome_path in EXTERNAL_GENOME_MAP.items():
+                rows.append({"group": EXTERNAL_GROUP, "genome_acc": genome_acc, "genome_path": genome_path})
 
-        if rows:
-            pl.DataFrame(rows).write_csv(out_path, separator="\t")
-        else:
-            pl.DataFrame(schema={"group": pl.Utf8, "genome_acc": pl.Utf8, "genome_path": pl.Utf8}).write_csv(
-                out_path,
-                separator="\t",
-            )
+            if rows:
+                pl.DataFrame(rows).write_csv(out_path, separator="\t")
+            else:
+                pl.DataFrame(schema={"group": pl.Utf8, "genome_acc": pl.Utf8, "genome_path": pl.Utf8}).write_csv(
+                    out_path,
+                    separator="\t",
+                )
 
 
 rule init_external_busco_lineage_cache:
@@ -171,10 +176,13 @@ rule init_external_busco_lineage_cache:
         download_path = BUSCO_DOWNLOAD_PATH
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("init_external_busco_lineage_cache")
     conda:
         env("busco")
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p {params.download_path}
         mkdir -p $(dirname {output.ready_marker})
         if [ ! -s {params.download_path}/file_versions.tsv ] || [ ! -d {params.download_path}/lineages/{params.lineage} ]; then
@@ -202,6 +210,8 @@ rule run_external_busco:
     threads: int(RESOURCE_CONFIG.get("busco_threads", 8))
     retries: TOTAL_ATTEMPTS
     resources: **BUSCO_RESOURCES
+    log:
+        log_path("run_external_busco", "group", "genome_acc")
     conda:
         env("busco")
     wildcard_constraints:
@@ -222,6 +232,8 @@ rule external_busco_results_quality_control:
         min_complete_markers = int(BUSCO_CONFIG["min_complete_markers"])
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("external_busco_results_quality_control")
     script:
         str(METAPACKAGE_SCRIPTS / "busco_results_quality_control.py")
 
@@ -233,6 +245,8 @@ rule external_build_checkm2_quality_report:
         report = EXTERNAL_PATHS["metadata"]["checkm2"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("external_build_checkm2_quality_report")
     script:
         str(METAPACKAGE_SCRIPTS / "build_checkm2_quality_report.py")
 
@@ -313,6 +327,8 @@ rule rebuild_taxonomy_mapping:
         external_taxid_map_path = str(EXTERNAL_TAXID_MAP)
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("rebuild_taxonomy_mapping")
     script:
         str(TREE_SCRIPTS / "rebuild_taxonomy_mapping.py")
 
@@ -332,6 +348,8 @@ checkpoint aggregate_external_busco_sequences:
     threads: 8
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("aggregate_external_busco_sequences")
     script:
         str(METAPACKAGE_SCRIPTS / "aggregate_busco_sequences.py")
 
@@ -351,6 +369,8 @@ rule merge_gene_fastas:
         use_external = USE_EXTERNAL
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("merge_gene_fastas", "gene")
     script:
         str(TREE_SCRIPTS / "merge_gene_fastas.py")
 
@@ -363,10 +383,13 @@ rule famsa:
     threads: 2
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("famsa", "gene")
     conda:
         env("align")
     shell:
         """
+        exec > {log} 2>&1
         famsa {input} {output}
         """
 
@@ -382,10 +405,13 @@ rule bmge:
         matrix = ALIGNMENT_CONFIG["bmge_matrix"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("bmge", "gene")
     conda:
         env("align")
     shell:
         """
+        exec > {log} 2>&1
         bmge -i {input} -of {output} -h {params.h} -g {params.g} -t AA -m {params.matrix}
         """
 
@@ -397,72 +423,75 @@ rule generate_alignment:
         concatinated_alignment = TREE_PATHS["alignment"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("generate_alignment")
     run:
-        from Bio import SeqIO
-        from Bio.Seq import Seq
-        from Bio.SeqRecord import SeqRecord
+        with redirect_to_log(log[0]):
+            from Bio import SeqIO
+            from Bio.Seq import Seq
+            from Bio.SeqRecord import SeqRecord
 
-        alignment_files = input.alignment_files
-        if isinstance(alignment_files, (str, Path)):
-            alignment_files = [Path(alignment_files)]
-        else:
-            alignment_files = [Path(path) for path in alignment_files]
+            alignment_files = input.alignment_files
+            if isinstance(alignment_files, (str, Path)):
+                alignment_files = [Path(alignment_files)]
+            else:
+                alignment_files = [Path(path) for path in alignment_files]
 
-        valid_alignment_files = [path for path in alignment_files if path.is_file()]
-        invalid_alignment_files = [path for path in alignment_files if not path.is_file()]
-        if invalid_alignment_files:
-            invalid_text = ", ".join(str(path) for path in invalid_alignment_files)
-            if not valid_alignment_files:
-                raise FileNotFoundError(f"No valid BMGE alignment files were found. Invalid inputs: {invalid_text}")
-            print(f"Skipping invalid BMGE alignment inputs: {invalid_text}")
+            valid_alignment_files = [path for path in alignment_files if path.is_file()]
+            invalid_alignment_files = [path for path in alignment_files if not path.is_file()]
+            if invalid_alignment_files:
+                invalid_text = ", ".join(str(path) for path in invalid_alignment_files)
+                if not valid_alignment_files:
+                    raise FileNotFoundError(f"No valid BMGE alignment files were found. Invalid inputs: {invalid_text}")
+                print(f"Skipping invalid BMGE alignment inputs: {invalid_text}")
 
-        species_df = pl.DataFrame(schema={"species_acc": str})
-        gene_length = {}
+            species_df = pl.DataFrame(schema={"species_acc": str})
+            gene_length = {}
 
-        for alignment_file in valid_alignment_files:
-            gene_name = alignment_file.name.split("_bmge")[0]
-            species_gene_dict = {}
-            for record in SeqIO.parse(str(alignment_file), "fasta"):
-                species = record.id.split("|")[0]
-                species_gene_dict.setdefault(species, str(record.seq))
+            for alignment_file in valid_alignment_files:
+                gene_name = alignment_file.name.split("_bmge")[0]
+                species_gene_dict = {}
+                for record in SeqIO.parse(str(alignment_file), "fasta"):
+                    species = record.id.split("|")[0]
+                    species_gene_dict.setdefault(species, str(record.seq))
 
-            if not species_gene_dict:
-                continue
+                if not species_gene_dict:
+                    continue
 
-            gene_index = f"gene_sequence-{gene_name}"
-            gene_length[gene_index] = len(next(iter(species_gene_dict.values())))
-            gene_df = (
-                pl.DataFrame(
-                    {
-                        "species_acc": list(species_gene_dict.keys()),
-                        gene_index: list(species_gene_dict.values()),
-                    }
+                gene_index = f"gene_sequence-{gene_name}"
+                gene_length[gene_index] = len(next(iter(species_gene_dict.values())))
+                gene_df = (
+                    pl.DataFrame(
+                        {
+                            "species_acc": list(species_gene_dict.keys()),
+                            gene_index: list(species_gene_dict.values()),
+                        }
+                    )
+                    .join(species_df.select("species_acc"), on="species_acc", how="full", coalesce=True)
                 )
-                .join(species_df.select("species_acc"), on="species_acc", how="full", coalesce=True)
+
+                species_df = species_df.join(gene_df, on="species_acc", how="full", coalesce=True)
+
+            species_df = (
+                species_df.with_columns(
+                    [
+                        pl.col(col).fill_null("-" * gene_length.get(col, 0))
+                        for col in species_df.columns
+                        if col.startswith("gene_sequence-")
+                    ]
+                )
+                .select(
+                    pl.col("species_acc"),
+                    pl.concat_str([pl.col("^gene_sequence-\\w+$")]).alias("full_gene_sequence"),
+                )
             )
 
-            species_df = species_df.join(gene_df, on="species_acc", how="full", coalesce=True)
+            final_seq_list = [
+                SeqRecord(seq=Seq(species["full_gene_sequence"]), id=str(species["species_acc"]), description="")
+                for species in species_df.iter_rows(named=True)
+            ]
 
-        species_df = (
-            species_df.with_columns(
-                [
-                    pl.col(col).fill_null("-" * gene_length.get(col, 0))
-                    for col in species_df.columns
-                    if col.startswith("gene_sequence-")
-                ]
-            )
-            .select(
-                pl.col("species_acc"),
-                pl.concat_str([pl.col("^gene_sequence-\\w+$")]).alias("full_gene_sequence"),
-            )
-        )
-
-        final_seq_list = [
-            SeqRecord(seq=Seq(species["full_gene_sequence"]), id=str(species["species_acc"]), description="")
-            for species in species_df.iter_rows(named=True)
-        ]
-
-        SeqIO.write(final_seq_list, output.concatinated_alignment, "fasta")
+            SeqIO.write(final_seq_list, output.concatinated_alignment, "fasta")
 
 
 rule build_tree:
@@ -472,10 +501,13 @@ rule build_tree:
         TREE_PATHS["newick"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("build_tree")
     conda:
         env("align")
     shell:
         """
+        exec > {log} 2>&1
         fasttree -nt {input} > {output}
         """
 
@@ -487,44 +519,47 @@ if OUTGROUP_ENABLED:
             rerooted_tree = TREE_PATHS["rerooted_newick"]
         retries: TOTAL_ATTEMPTS
         resources: **DEFAULT_RESOURCES
+        log:
+            log_path("reroot_tree")
         conda:
             env("taxonomy")
         run:
-            import dendropy
+            with redirect_to_log(log[0]):
+                import dendropy
 
-            # Load the tree with force-rooted option to properly handle tree state
-            tree = dendropy.Tree.get(
-                path=input.tree, 
-                schema="newick", 
-                preserve_underscores=True, 
-                rooting="force-rooted"
-            )
+                # Load the tree with force-rooted option to properly handle tree state
+                tree = dendropy.Tree.get(
+                    path=input.tree, 
+                    schema="newick", 
+                    preserve_underscores=True, 
+                    rooting="force-rooted"
+                )
 
-            # Filter keys from the global OUTGROUP_GENOME_MAP that exist in the tree
-            valid_taxa = [acc for acc in OUTGROUP_GENOME_MAP.keys() if acc in tree.taxon_namespace.labels()]
+                # Filter keys from the global OUTGROUP_GENOME_MAP that exist in the tree
+                valid_taxa = [acc for acc in OUTGROUP_GENOME_MAP.keys() if acc in tree.taxon_namespace.labels()]
 
-            if valid_taxa and len(valid_taxa) > 1:
-                # Find the Most Recent Common Ancestor (MRCA) of these outgroup genomes
-                mrca_node = tree.mrca(taxon_labels=valid_taxa)
+                if valid_taxa and len(valid_taxa) > 1:
+                    # Find the Most Recent Common Ancestor (MRCA) of these outgroup genomes
+                    mrca_node = tree.mrca(taxon_labels=valid_taxa)
                 
-                if mrca_node and mrca_node.edge:
-                    edge_length = mrca_node.edge.length
-                    length_split = 0.5 * edge_length if edge_length is not None else None
+                    if mrca_node and mrca_node.edge:
+                        edge_length = mrca_node.edge.length
+                        length_split = 0.5 * edge_length if edge_length is not None else None
                     
-                    # Reroot the tree at the edge leading to the MRCA clade
-                    tree.reroot_at_edge(
-                        mrca_node.edge, 
-                        length1=length_split, 
-                        length2=length_split, 
-                        update_bipartitions=False
-                    )
+                        # Reroot the tree at the edge leading to the MRCA clade
+                        tree.reroot_at_edge(
+                            mrca_node.edge, 
+                            length1=length_split, 
+                            length2=length_split, 
+                            update_bipartitions=False
+                        )
 
-            else:
-                # If no valid outgroup taxa are found, fallback to midpoint rooting
-                tree.reroot_at_midpoint(update_bipartitions=False)
+                else:
+                    # If no valid outgroup taxa are found, fallback to midpoint rooting
+                    tree.reroot_at_midpoint(update_bipartitions=False)
 
-            # Write out the updated tree
-            tree.write(path=output.rerooted_tree, schema="newick", unquoted_underscores=True)
+                # Write out the updated tree
+                tree.write(path=output.rerooted_tree, schema="newick", unquoted_underscores=True)
 
 else:
     rule reroot_tree:
@@ -534,14 +569,17 @@ else:
             rerooted_tree = TREE_PATHS["rerooted_newick"]
         retries: TOTAL_ATTEMPTS
         resources: **DEFAULT_RESOURCES
+        log:
+            log_path("reroot_tree")
         conda:
             env("taxonomy")
         run:
-            import dendropy
+            with redirect_to_log(log[0]):
+                import dendropy
 
-            tree = dendropy.Tree.get(path=input.tree, schema="newick", preserve_underscores=True)
-            tree.reroot_at_midpoint(update_bipartitions=False)
-            tree.write(path=output.rerooted_tree, schema="newick", unquoted_underscores=True)
+                tree = dendropy.Tree.get(path=input.tree, schema="newick", preserve_underscores=True)
+                tree.reroot_at_midpoint(update_bipartitions=False)
+                tree.write(path=output.rerooted_tree, schema="newick", unquoted_underscores=True)
 
 
 rule prepare_taxonomy:
@@ -553,6 +591,8 @@ rule prepare_taxonomy:
         trusted_taxa = TAXONOMY_PATHS["trusted_taxa"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("prepare_taxonomy")
     conda:
         env("taxonomy")
     script:
@@ -570,10 +610,13 @@ rule phylorank_decorate:
         command = TAXONOMY_CONFIG["phylorank_command"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("phylorank_decorate")
     conda:
         env("taxonomy")
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p $(dirname {output.decorated_tree})
         {params.command} decorate -t {input.trusted_taxa} --skip_rd_refine {input.tree} {input.taxonomy} {output.decorated_tree}
         """
@@ -592,10 +635,13 @@ rule phylorank_red:
         red_dir = TAXONOMY_PATHS["red_dir"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("phylorank_red")
     conda:
         env("taxonomy")
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p {params.red_dir}
         {params.command} outliers -t {input.trusted_taxa} {input.decorated_tree} {input.taxonomy} {params.red_dir}
         test -s {output.red_tree}
@@ -616,6 +662,8 @@ rule assign_taxonomy:
         # partial_map = TAXONOMY_PATHS["partial_map"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("assign_taxonomy")
     conda:
         env("taxonomy")
     script:
@@ -630,6 +678,8 @@ rule generate_metadata:
         metadata = TAXONOMY_PATHS["metadata"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    log:
+        log_path("generate_metadata")
     conda:
         env("taxonomy")
     script:
