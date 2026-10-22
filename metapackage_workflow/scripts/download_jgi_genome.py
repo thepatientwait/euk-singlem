@@ -88,6 +88,12 @@ def main():
     if not token:
         raise ValueError("JGI token missing from Snakemake config/secrets.yaml.")
 
+    # Reuse existing downloads. Zero-byte files are failure markers; they only reach
+    # this point when retry_failed_downloads is enabled, so fall through and retry.
+    if Path(output_file).exists() and Path(output_file).stat().st_size > 0:
+        logger.info(f"Genome already present, skipping download: {output_file}")
+        return
+
     # 2. Setup output directories
     output_dir = Path(output_file).parent
     output_dir.mkdir(parents=True, exist_ok=True)

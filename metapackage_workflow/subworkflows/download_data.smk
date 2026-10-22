@@ -21,6 +21,7 @@ from helpers import (
     build_all_genomes_to_download,
     create_resource_profile_factory,
     get_existing_genome_paths_from_metadata,
+    get_on_disk_genome_paths,
     get_genome_name,
     get_p10k_genome_url,
     write_genome_manifest_nls,
@@ -48,6 +49,9 @@ ALL_GENOME_DOWNLOAD_TARGETS = build_all_genomes_to_download(
     jgi_checkpoint_getter=lambda group: checkpoints.download_jgi_metadata.get(group=group),
     p10k_checkpoint_getter=lambda: checkpoints.download_p10k_metadata.get(),
     ncbi_checkpoint_getter=lambda: checkpoints.discover_ncbi_genomes.get(),
+    # Genomes already on disk (including zero-byte failure markers) get no download job.
+    # Set retry_failed_downloads: true in config.yaml to re-request the zero-byte ones.
+    retry_failed=bool(config.get("retry_failed_downloads", False)),
 )
 
 localrules: download_jgi_metadata, download_p10k_metadata, discover_ncbi_genomes, build_unified_manifest, fetch_ncbi_taxonomy, cleanup_failed_genomes, write_genome_manifest,
@@ -244,6 +248,8 @@ rule fetch_ncbi_taxonomy:
 
 rule cleanup_failed_genomes:
     input:
+        # Only genomes still needing a download; being listed here is what triggers downloads.
+        # Validation below covers every genome on disk, not just these.
         genomes = ALL_GENOME_DOWNLOAD_TARGETS
     output:
         report = CLEANUP["report"],
@@ -300,11 +306,15 @@ rule cleanup_failed_genomes:
 
         report_path = Path(output.report)
         report_path.parent.mkdir(parents=True, exist_ok=True)
-        logger.info(f"[cleanup_failed_genomes] Checking {len(input.genomes)} genome files for validity...")
+        # Validate everything on disk (already-present genomes are not rule inputs).
+        # Failures are only reported, never deleted: zero-byte files stay in place as
+        # markers so they are not re-requested on every run.
+        genome_paths_to_check = get_on_disk_genome_paths(GROUPS)
+        logger.info(f"[cleanup_failed_genomes] Checking {len(genome_paths_to_check)} genome files for validity...")
 
         removed_rows = []
         # for genome_path in tqdm(sorted([Path(p) for p in input.genomes]), desc="Checking genome files"):
-        for genome_path in sorted([Path(p) for p in input.genomes]):
+        for genome_path in sorted(Path(p) for p in genome_paths_to_check):
             res = has_valid_gzip_eof(genome_path)
             if res:
                 group, genome_acc, genome_path_str, reason = res

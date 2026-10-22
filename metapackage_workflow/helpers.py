@@ -261,32 +261,79 @@ def get_successful_p10k_genome_accs_list() -> List[str]:  # type: ignore[no-rede
     return list(get_successful_p10k_genome_accs())
 
 
+def get_expected_genome_paths(
+    groups: List[str],
+    jgi_checkpoint_getter: Optional[Callable] = None,
+    p10k_checkpoint_getter: Optional[Callable] = None,
+    ncbi_checkpoint_getter: Optional[Callable] = None,
+) -> List[str]:
+    """All genome paths listed in the metadata (whether or not they exist on disk).
+
+    Checkpoint getters are only needed inside the DAG, to wait for the metadata files.
+    """
+    paths = []
+
+    for group in groups:
+        if jgi_checkpoint_getter:
+            jgi_checkpoint_getter(group)
+        genome_accs, _ = get_jgi_genome_accs(group)
+        paths.extend(f"outputs/genomes/{group}/{acc}.fasta.gz" for acc in sorted(genome_accs))
+
+    if p10k_checkpoint_getter:
+        p10k_checkpoint_getter()
+    paths.extend(f"outputs/genomes/p10k/{acc}.fasta.gz" for acc in sorted(set(get_p10k_genome_accs())))
+
+    if ncbi_checkpoint_getter:
+        ncbi_checkpoint_getter()
+    paths.extend(f"outputs/genomes/ncbi/{acc}.fasta.gz" for acc in get_ncbi_genome_accs())
+
+    return paths
+
+
+def needs_download(path: str, retry_failed: bool = False) -> bool:
+    """True if the genome file is absent, or (with retry_failed) a zero-byte failure marker.
+
+    Zero-byte files are written by the download scripts for assemblies that are
+    permanently unavailable (e.g. suppressed). They are left in place and not re-requested
+    unless retry_failed is set.
+    """
+    p = Path(path)
+    if not p.exists():
+        return True
+    return retry_failed and p.stat().st_size == 0
+
+
 def build_all_genomes_to_download(
     groups: List[str],
     jgi_checkpoint_getter: Callable,
     p10k_checkpoint_getter: Callable,
     ncbi_checkpoint_getter: Callable,
+    retry_failed: bool = False,
 ) -> Callable:
+    """Input function returning only genomes that still need a download job.
+
+    Genomes already on disk get no job at all (so no queue time and no rerun-trigger
+    re-downloads). The checkpoint getters are still called so the DAG waits for metadata.
+    """
     def _get_all_genomes_to_download(wildcards):
-        all_genomes = []
-
-        for group in groups:
-            jgi_checkpoint_getter(group)
-            genome_accs, _ = get_jgi_genome_accs(group)
-            for genome_acc in sorted(genome_accs):
-                all_genomes.append(f"outputs/genomes/{group}/{genome_acc}.fasta.gz")
-
-        p10k_checkpoint_getter()
-        for genome_acc in sorted(get_p10k_genome_accs()):
-            all_genomes.append(f"outputs/genomes/p10k/{genome_acc}.fasta.gz")
-
-        ncbi_checkpoint_getter()
-        for genome_acc in get_ncbi_genome_accs():
-            all_genomes.append(f"outputs/genomes/ncbi/{genome_acc}.fasta.gz")
-
-        return all_genomes
+        expected = get_expected_genome_paths(
+            groups, jgi_checkpoint_getter, p10k_checkpoint_getter, ncbi_checkpoint_getter
+        )
+        if retry_failed:
+            # An existing zero-byte file counts as up to date for Snakemake, so remove the
+            # failure marker to make the download rule run again (idempotent).
+            for path in expected:
+                p = Path(path)
+                if p.exists() and p.stat().st_size == 0:
+                    p.unlink()
+        return [path for path in expected if needs_download(path, retry_failed)]
 
     return _get_all_genomes_to_download
+
+
+def get_on_disk_genome_paths(groups: List[str]) -> List[str]:
+    """Metadata-listed genomes present on disk, including zero-byte failure markers."""
+    return sorted(p for p in get_expected_genome_paths(groups) if Path(p).exists())
 
 
 def get_existing_genome_paths_from_metadata(groups: List[str]) -> List[str]:

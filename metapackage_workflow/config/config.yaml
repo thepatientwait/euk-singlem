@@ -4,6 +4,10 @@ groups:
   - fungi
   - algae
 
+# Genomes already on disk are never re-requested. Zero-byte files are failure markers
+# (e.g. suppressed assemblies); set true to retry those on the next run.
+retry_failed_downloads: false
+
 # JGI API URLs for metadata download
 jgi_config:
   fungi:
