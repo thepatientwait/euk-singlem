@@ -14,6 +14,7 @@ from helpers import (
     create_dirs,
     load_external_genome_map,
     load_valid_genes,
+    pixi_env,
 )
 
 
@@ -21,7 +22,6 @@ ROOT                = Path(workflow.basedir).resolve()
 METAPACKAGE_ROOT    = ROOT.parent / "metapackage_workflow"
 METAPACKAGE_SCRIPTS = METAPACKAGE_ROOT / "scripts"
 TREE_SCRIPTS        = ROOT / "scripts"
-TAXONOMY_ENV        = str(ROOT / "envs" / "taxonomy.yaml")
 CONFIG_PATH         = ROOT / "config.yaml"
 PATHS_CONFIG_PATH   = ROOT / "paths.yaml"
 
@@ -46,6 +46,22 @@ TOTAL_ATTEMPTS     = int(RESOURCE_CONFIG.get("total_attempts", 3))
 RESOURCE_PROFILE   = create_resource_profile_factory(BASE_MEM_MB, BASE_RUNTIME, TOTAL_ATTEMPTS)
 DEFAULT_RESOURCES  = RESOURCE_PROFILE()
 BUSCO_RESOURCES    = RESOURCE_PROFILE(busco=True)
+
+# one pixi environment per group of similar rules (see pixi.toml); override the
+# location with `--config pixi_envs_dir=/path` if pixi uses detached environments
+PIXI_ENVS_USED = {}
+
+
+def env(name):
+    PIXI_ENVS_USED[name] = pixi_env(ROOT, name, config.get("pixi_envs_dir"), check=False)
+    return PIXI_ENVS_USED[name]
+
+
+onstart:
+    # a missing env directory would otherwise be mistaken for an env *name* by snakemake
+    if not workflow.dryrun:
+        for _name in PIXI_ENVS_USED:
+            pixi_env(ROOT, _name, config.get("pixi_envs_dir"))
 
 EXTERNAL_PATHS = WORKFLOW_PATHS["external"]
 MERGED_PATHS   = WORKFLOW_PATHS["merged"]
@@ -156,7 +172,7 @@ rule init_external_busco_lineage_cache:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        str(ROOT / "envs" / "busco.yaml")
+        env("busco")
     shell:
         """
         mkdir -p {params.download_path}
@@ -187,7 +203,7 @@ rule run_external_busco:
     retries: TOTAL_ATTEMPTS
     resources: **BUSCO_RESOURCES
     conda:
-        str(ROOT / "envs" / "busco.yaml")
+        env("busco")
     wildcard_constraints:
         group = EXTERNAL_GROUP
     script:
@@ -260,7 +276,7 @@ rule external_build_checkm2_quality_report:
 #     resources: **DEFAULT_RESOURCES
 #     # resources: **RESOURCE_PROFILE(mem_scale=20)  # EukCC can be memory intensive, so we scale up memory for this step
 #     conda:
-#         str(ROOT / "envs" / "eukcc.yaml")
+#         env("eukcc")
 #     script:
 #         str(TREE_SCRIPTS / "run_eukcc.py")
 
@@ -347,6 +363,8 @@ rule famsa:
     threads: 2
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    conda:
+        env("align")
     shell:
         """
         famsa {input} {output}
@@ -364,6 +382,8 @@ rule bmge:
         matrix = ALIGNMENT_CONFIG["bmge_matrix"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    conda:
+        env("align")
     shell:
         """
         bmge -i {input} -of {output} -h {params.h} -g {params.g} -t AA -m {params.matrix}
@@ -452,6 +472,8 @@ rule build_tree:
         TREE_PATHS["newick"]
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
+    conda:
+        env("align")
     shell:
         """
         fasttree -nt {input} > {output}
@@ -466,7 +488,7 @@ if OUTGROUP_ENABLED:
         retries: TOTAL_ATTEMPTS
         resources: **DEFAULT_RESOURCES
         conda:
-            TAXONOMY_ENV
+            env("taxonomy")
         run:
             import dendropy
 
@@ -513,7 +535,7 @@ else:
         retries: TOTAL_ATTEMPTS
         resources: **DEFAULT_RESOURCES
         conda:
-            TAXONOMY_ENV
+            env("taxonomy")
         run:
             import dendropy
 
@@ -532,7 +554,7 @@ rule prepare_taxonomy:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        TAXONOMY_ENV
+        env("taxonomy")
     script:
         str(TREE_SCRIPTS / "prepare_taxonomy.py")
 
@@ -549,7 +571,7 @@ rule phylorank_decorate:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        TAXONOMY_ENV
+        env("taxonomy")
     shell:
         """
         mkdir -p $(dirname {output.decorated_tree})
@@ -571,7 +593,7 @@ rule phylorank_red:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        TAXONOMY_ENV
+        env("taxonomy")
     shell:
         """
         mkdir -p {params.red_dir}
@@ -595,7 +617,7 @@ rule assign_taxonomy:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        TAXONOMY_ENV
+        env("taxonomy")
     script:
         str(TREE_SCRIPTS / "assign_taxonomy_v5.py")
 
@@ -609,6 +631,6 @@ rule generate_metadata:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     conda:
-        TAXONOMY_ENV
+        env("taxonomy")
     script:
         str(TREE_SCRIPTS / "generate_tree_metadata.py")

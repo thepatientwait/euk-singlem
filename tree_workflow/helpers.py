@@ -228,3 +228,27 @@ def get_busco_mem_mb(base_mem_mb: int, total_attempts: int) -> Callable:
         return scaled_mem * (2 ** (attempt - 1))
 
     return _get_busco_mem_mb
+
+
+def pixi_env(workflow_dir, name, envs_dir=None, check=True):
+    """Absolute path of pixi environment `name` for use in a rule's `conda:` directive.
+
+    Snakemake treats a directory path as an existing conda prefix and activates it
+    without creating or modifying it. If the directory does not exist it silently falls
+    back to treating the path as an environment *name*, which fails later with a cryptic
+    "Environment names cannot contain path separators"; so with `check=True` a missing
+    environment raises immediately with instructions.
+
+    `envs_dir` overrides the default `<workflow_dir>/.pixi/envs` (e.g. when pixi's
+    `detached-environments` is set).
+    """
+    base = Path(envs_dir) if envs_dir else Path(workflow_dir) / ".pixi" / "envs"
+    path = (base / name).resolve()
+    if check and not (path / "conda-meta").is_dir():
+        raise FileNotFoundError(
+            f"pixi environment '{name}' not found at {path}.\n"
+            f"Run `pixi install --all` in {workflow_dir} first (needs network). If pixi keeps its "
+            f"environments elsewhere, pass --config pixi_envs_dir=/path/to/envs. "
+            f"Dry runs (-n) skip this check."
+        )
+    return path.as_posix()

@@ -1,11 +1,58 @@
 [workspace]
-authors = ["thepatientwait <thepatientwait@gmail.com>"]
-channels = ["conda-forge"]
 name = "tree_workflow"
+channels = ["conda-forge", "bioconda"]
 platforms = ["linux-64"]
-version = "0.1.0"
 
-[tasks]
+# Snakemake (9.x) has no native pixi support, but its `conda:` directive accepts the path
+# of an existing environment directory. Each rule group below gets its own environment at
+# .pixi/envs/<name>; rules reference them via `env("<name>")` in the snakefile.
+#
+#   pixi install --all      # create/update every environment (needs network)
+#   pixi run snakemake -c8  # run the workflow (driver = default env)
 
-[dependencies]
+[dependencies]            # default env: the snakemake driver (also runs every rule without a `conda:`)
+python = "3.12.*"
+snakemake = ">=9.0"
+snakemake-executor-plugin-cluster-generic = "*"
 polars = ">=1.39.3,<2"
+pyyaml = "*"
+biopython = "*"
+joblib = "*"
+requests = "*"
+tqdm = "*"
+ncbi-datasets-cli = "*"   # fetch_ncbi_taxonomy.py (shared with the metapackage workflow)
+
+[activation]
+# snakemake activates rule environments through conda's `activate`
+env = { PATH = "/mnt/weka/pkg/cmr/sw/conda/condabin:$PATH" }
+
+# BUSCO runs (init_external_busco_lineage_cache, run_external_busco)
+[feature.busco.dependencies]
+python = "3.12.*"
+busco = ">=5"
+
+# EukCC (only used by the currently disabled run_external_eukcc rule)
+[feature.eukcc.dependencies]
+python = "3.12.*"
+eukcc = "*"
+
+# alignment and tree building (famsa, bmge, fasttree)
+[feature.align.dependencies]
+famsa = "*"
+bmge = "*"
+fasttree = "*"
+
+# tree rerooting, PhyloRank and taxonomy assignment
+[feature.taxonomy.dependencies]
+python = "3.10.*"
+matplotlib = ">3.10.0"
+dendropy = "*"
+phylorank = "*"
+polars = "*"
+
+[environments]
+default  = { solve-group = "all" }
+busco    = { features = ["busco"],    no-default-feature = true }
+eukcc    = { features = ["eukcc"],    no-default-feature = true }
+align    = { features = ["align"],    no-default-feature = true }
+taxonomy = { features = ["taxonomy"], no-default-feature = true }
