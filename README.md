@@ -22,15 +22,21 @@ Two subworkflows, run separately (config lives in `metapackage_workflow/config/`
 
 ```bash
 cd metapackage_workflow
+pixi install --all   # once: the snakemake driver (default) + per-rule envs (singlem, graftm, busco, coverm)
 
 # phase 1: metadata + genome download (JGI / NCBI / P10K -> unified manifest)
-snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda \
+pixi run snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda \
     -s subworkflows/download_data.smk
 
 # phase 2: BUSCO/CheckM2 QC, SingleM packages, off-target screen, metapackage
-snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda \
+pixi run snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda \
     -s subworkflows/generate_metapackage.smk
 ```
+
+Software environments are managed with pixi (`pixi.toml`). Snakemake has no native
+pixi support, but its `conda:` directive accepts the path of an existing environment,
+so rules use `conda: env("<name>")`, which resolves to `.pixi/envs/<name>`. If pixi
+keeps its environments elsewhere, pass `--config pixi_envs_dir=/path/to/envs`.
 
 Notes:
 
@@ -50,7 +56,8 @@ Notes:
 
 ```bash
 cd tree_workflow
-snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda -n
+pixi install --all   # once: default (driver) + busco, eukcc, align, taxonomy envs
+pixi run snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda -n
 ```
 
 Config: `config.yaml` (metapackage inputs, `external` genomes, `outgroup`,
