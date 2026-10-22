@@ -329,17 +329,40 @@ def needs_download(path: str, retry_failed: bool = False) -> bool:
     return retry_failed and p.stat().st_size == 0
 
 
+def get_jgi_purged_paths(groups: List[str]) -> set:
+    """Genome paths whose JGI file is still on tape (PURGED) according to the group JSON.
+
+    Read straight from the JSON (not the on-disk cache used by get_jgi_genome_accs), so
+    refreshing the metadata is enough to pick up newly RESTORED files.
+    """
+    purged = set()
+    for group in groups:
+        with open(f"outputs/metadata/source/jgi/{group}.json", "r", encoding="utf-8") as handle:
+            organisms = json.load(handle)["organisms"]
+        for org in organisms:
+            files = org.get("files") or []
+            if not files:
+                continue
+            biggest = max(files, key=lambda f: int(f.get("file_size") or 0))
+            if biggest.get("file_status") == "PURGED":
+                purged.add(f"outputs/genomes/{group}/{org.get('portal_detail_id')}.fasta.gz")
+    return purged
+
+
 def build_all_genomes_to_download(
     groups: List[str],
     jgi_checkpoint_getter: Callable,
     p10k_checkpoint_getter: Callable,
     ncbi_checkpoint_getter: Callable,
     retry_failed: bool = False,
+    skip_jgi_purged: bool = True,
 ) -> Callable:
     """Input function returning only genomes that still need a download job.
 
     Genomes already on disk get no job at all (so no queue time and no rerun-trigger
     re-downloads). The checkpoint getters are still called so the DAG waits for metadata.
+    JGI genomes that are still PURGED (tape) are left out until a metadata refresh shows them
+    as restored.
     """
     def _get_all_genomes_to_download(wildcards):
         expected = get_expected_genome_paths(
@@ -352,7 +375,9 @@ def build_all_genomes_to_download(
                 p = Path(path)
                 if p.exists() and p.stat().st_size == 0:
                     p.unlink()
-        return [path for path in expected if needs_download(path, retry_failed)]
+        # Genomes still on tape cannot be downloaded yet: no job until JGI has restored them
+        purged = get_jgi_purged_paths(groups) if skip_jgi_purged else set()
+        return [path for path in expected if path not in purged and needs_download(path, retry_failed)]
 
     return _get_all_genomes_to_download
 

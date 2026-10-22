@@ -1,381 +1,140 @@
 #!/usr/bin/env python3
+"""Download one JGI genome that is already on disk at JGI (RESTORED / BACKUP_COMPLETE).
 
-import os
+Files that are still PURGED (tape) are NOT waited for: use the jgi_request_restore rule,
+then run again once the restore has finished. A rejected/expired token fails immediately.
+"""
 import gzip
-import json
-import time
+import os
+import shutil
 import zipfile
-import requests
 from pathlib import Path
+
+from jgi_common import (
+    JDP_DOWNLOAD_URL,
+    JDP_SEARCH_URL,
+    JgiAuthError,
+    JgiNotRestoredError,
+    check_token,
+    make_session,
+    request_with_retries,
+    restore_entry,
+)
 from log_config import configure_logger
 
-logger_name = os.path.splitext(os.path.basename(__file__))[0]
-logger = configure_logger(logger_name)
-
-JDP_SEARCH_URL = "https://files.jgi.doe.gov/mycocosm_file_list/"
-JDP_RESTORE_URL = "https://files.jgi.doe.gov/request_archived_files/"
-JDP_DOWNLOAD_URL = "https://files-download.jgi.doe.gov/download_files/"
-MAX_API_ATTEMPTS = 10
-RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
-RETRY_SLEEP_SECONDS = 5
-
-
-def request_with_retries(session, method, url, **kwargs):
-    """Make an API request with bounded retries for transient failures."""
-    max_attempts = kwargs.pop("max_attempts", MAX_API_ATTEMPTS)
-    for attempt in range(1, max_attempts + 1):
-        try:
-            response = session.request(method, url, **kwargs)
-        except requests.RequestException as e:
-            if attempt == max_attempts:
-                raise
-            delay = min(RETRY_SLEEP_SECONDS * 2 ** (attempt - 1), 60)
-            logger.warning(
-                f"API request failed on attempt {attempt}/{max_attempts}: {e}. "
-                f"Retrying in {delay}s..."
-            )
-            time.sleep(delay)
-            continue
-
-        if response.status_code not in RETRYABLE_STATUS_CODES:
-            return response
-
-        if attempt == max_attempts:
-            return response
-
-        delay = min(RETRY_SLEEP_SECONDS * 2 ** (attempt - 1), 60)
-        logger.warning(
-            f"API request returned HTTP {response.status_code} on attempt "
-            f"{attempt}/{max_attempts}. Retrying in {delay}s..."
-        )
-        response.close()
-        time.sleep(delay)
-
-    raise RuntimeError(f"API request failed after {max_attempts} attempts")
+logger = configure_logger(os.path.splitext(os.path.basename(__file__))[0])
 
 
 def validate_gzip_file(file_path):
     """Ensure the gzip stream can be read to EOF."""
-    logger.info(f"Starting gzip integrity validation for: {file_path}")
     try:
-        with gzip.open(file_path, 'rb') as handle:
-            bytes_read = 0
-            while True:
-                chunk = handle.read(1024 * 1024)
-                if not chunk:
-                    break
-                bytes_read += len(chunk)
-        logger.info(f"Gzip validation passed successfully. Total uncompressed bytes read: {bytes_read}")
+        with gzip.open(file_path, "rb") as handle:
+            while handle.read(1024 * 1024):
+                pass
         return True
-    except (EOFError, OSError, gzip.BadGzipFile) as e:
-        logger.error(f"Gzip validation failed with exception: {type(e).__name__}: {e}")
+    except (EOFError, OSError, gzip.BadGzipFile) as exc:
+        logger.error("Gzip validation failed: %s: %s", type(exc).__name__, exc)
         return False
 
 
-def main():
-    logger.info("Entering script main execution block...")
-    
-    # 1. Extract Snakemake variables
-    try:
-        genome_acc = snakemake.wildcards.genome_acc
-        output_file = snakemake.output.genome
-        target_filename = snakemake.params.name
-        token = snakemake.params.token
-    except Exception as e:
-        logger.error(f"Failed to pull variables from snakemake object: {e}")
-        raise e
-
-    if not token:
-        raise ValueError("JGI token missing from Snakemake config/secrets.yaml.")
-
-    # Reuse existing downloads. Zero-byte files are failure markers; they only reach
-    # this point when retry_failed_downloads is enabled, so fall through and retry.
-    if Path(output_file).exists() and Path(output_file).stat().st_size > 0:
-        logger.info(f"Genome already present, skipping download: {output_file}")
-        return
-
-    # 2. Setup output directories
-    output_dir = Path(output_file).parent
-    output_dir.mkdir(parents=True, exist_ok=True)
-    downloaded_file = output_dir / target_filename
-    temp_zip_file = output_dir / f"{genome_acc}_download.zip"
-
-    # 3. Configure HTTP session and headers
-    session = requests.Session()
-    auth_header = token if token.startswith("Bearer ") else f"Bearer {token}"
-    session.headers.update({
-        "Authorization": auth_header,
-        "Accept": "application/json, application/zip, application/octet-stream",
-        "Content-Type": "application/json"
-    })
-
-    # 4. Prepare Mycocosm file list query parameters
-    params = {
-        "organism": genome_acc,
-        "api_version": 2,
-        "a": "false",
-        "h": "false",
-        "d": "asc",
-        "p": 1,
-        "x": 50,
-        "t": "simple"
-    }
-
-    req_prepped = requests.Request('GET', JDP_SEARCH_URL, params=params).prepare()
-
-    # 5. Execute API Request
-    response = request_with_retries(
-        session,
-        req_prepped.method,
-        req_prepped.url,
-        timeout=30,
-    )
-
-    if response.status_code in (401, 403):
-        raise RuntimeError("JGI Authentication failed (401/403). Your session token has likely expired.")
-    
-    if response.status_code != 200:
-        logger.error(f"Non-200 Response Text Output:\n{response.text}")
-        raise RuntimeError(f"Mycocosm file list query failed with status code {response.status_code}")
-
-    try:
-        data = response.json()
-    except Exception as e:
-        logger.error(f"Failed to decode JSON. Full raw response text output follows:\n{response.text}")
-        raise e
-
-    organisms = data.get("organisms", [])
-    target_file_obj = None
-    target_org_key = None
-    target_portal_id = None
-    target_top_hit = None
-    
-    # 6. Iterate and match exact filename, recording proper dictionary grouping keys
+def find_file(organisms, genome_acc, target_filename):
+    """Exact file name first, then any assembly file mentioning the accession."""
     for org in organisms:
-        org_id = org.get("id") or org.get("_id")
-        portal_id = org.get("mycocosm_portal_id") or org.get("portal_id") or org.get("name")
-        top_hit = org.get("top_hit", {}).get("_id")
-        
-        files = org.get("files", [])
-        for f in files:
-            fname = f.get("file_name")
-            jamo_id = f.get("_id")
-            if fname == target_filename and jamo_id:
-                target_file_obj = f
-                target_org_key = org_id or f"Mycocosm_{genome_acc}"
-                target_portal_id = portal_id
-                target_top_hit = top_hit
-                break
-        if target_file_obj:
-            break
+        for f in org.get("files", []):
+            if f.get("file_name") == target_filename and f.get("_id"):
+                return org, f
+    for org in organisms:
+        for f in org.get("files", []):
+            fname = f.get("file_name", "")
+            if genome_acc in fname and fname.endswith((".fa.gz", ".fasta.gz")) and f.get("_id"):
+                return org, f
+    return None, None
 
-    # 7. Fallback pattern match if exact filename isn't hit
-    if not target_file_obj:
-        for org in organisms:
-            org_id = org.get("id") or org.get("_id")
-            portal_id = org.get("mycocosm_portal_id") or org.get("portal_id") or org.get("name")
-            top_hit = org.get("top_hit", {}).get("_id")
-            
-            files = org.get("files", [])
-            for f in files:
-                fname = f.get("file_name", "")
-                jamo_id = f.get("_id")
-                if genome_acc in fname and (fname.endswith(".fa.gz") or fname.endswith(".fasta.gz")) and jamo_id:
-                    target_file_obj = f
-                    target_org_key = org_id or f"Mycocosm_{genome_acc}"
-                    target_portal_id = portal_id
-                    target_top_hit = top_hit
-                    break
-            if target_file_obj:
-                break
 
-    if not target_file_obj:
-        logger.warning(f"No matching files found on JDP matching organism '{genome_acc}' or target '{target_filename}'.")
-        Path(output_file).touch()
+def main():
+    genome_acc = snakemake.wildcards.genome_acc
+    output_file = Path(snakemake.output.genome)
+    target_filename = snakemake.params.name
+    token = snakemake.params.token
+
+    if output_file.exists() and output_file.stat().st_size > 0:
+        logger.info("Genome already present, skipping download: %s", output_file)
         return
 
-    jamo_id = target_file_obj.get("_id")
-    file_status = target_file_obj.get("file_status", "UNKNOWN")
-    logger.info(f"Target file resolved. ID: {jamo_id}, Status: {file_status}")
+    check_token(token)
 
-    # 8. Handle PURGED (tape-archived) files via restoration request & polling
-    if file_status == "PURGED":
-        logger.info("File is PURGED on tape archive. Initiating restoration request...")
-        
-        sub_dict = {"file_ids": [jamo_id]}
-        if target_top_hit:
-            sub_dict["top_hit"] = target_top_hit
-        if target_portal_id:
-            sub_dict["mycocosm_portal_id"] = target_portal_id
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    downloaded_file = output_file.parent / target_filename
+    temp_zip_file = output_file.parent / f"{genome_acc}_download.zip"
+    session = make_session(token)
 
-        restore_payload = {
-            "ids": {
-                target_org_key: sub_dict
-            },
-            "send_mail": False,
-            "api_version": "2"
-        }
-        
-        try:
-            restore_resp = request_with_retries(
-                session,
-                "POST",
-                JDP_RESTORE_URL,
-                json=restore_payload,
-                timeout=30,
-            )
-            logger.info(f"Restoration response code: {restore_resp.status_code}")
-            logger.debug(f"Restoration response text: {restore_resp.text}")
-            restore_resp.raise_for_status()
-        except Exception as e:
-            logger.error(f"Failed to submit restoration request: {e}")
-            raise e
+    response = request_with_retries(
+        session, "GET", JDP_SEARCH_URL, logger, timeout=30,
+        params={"organism": genome_acc, "api_version": 2, "a": "false", "h": "false",
+                "d": "asc", "p": 1, "x": 50, "t": "simple"},
+    )
+    if response.status_code != 200:
+        raise RuntimeError(f"Mycocosm file list query failed: HTTP {response.status_code}: {response.text[:300]}")
+    org, file_obj = find_file(response.json().get("organisms", []), genome_acc, target_filename)
 
-        # Poll until RESTORED
-        poll_attempts = 0
-        max_poll_attempts = 120
-        while poll_attempts < max_poll_attempts:
-            poll_attempts += 1
-            logger.info(f"Requerying file status (Attempt {poll_attempts}/{max_poll_attempts})...")
-            
-            try:
-                poll_resp = request_with_retries(
-                    session,
-                    req_prepped.method,
-                    req_prepped.url,
-                    timeout=30,
-                )
-                poll_resp.raise_for_status()
-                poll_data = poll_resp.json()
-            except Exception as e:
-                logger.warning(f"Error requerying status: {e}. Retrying in 60s...")
-                time.sleep(180)
-                continue
+    if file_obj is None:
+        logger.warning("No file matching %s / %s on JDP; writing an empty failure marker.", genome_acc, target_filename)
+        output_file.touch()
+        return
 
-            current_status = "UNKNOWN"
-            for org in poll_data.get("organisms", []):
-                for f in org.get("files", []):
-                    if f.get("_id") == jamo_id:
-                        current_status = f.get("file_status")
-                        break
-                if current_status != "UNKNOWN":
-                    break
+    status = file_obj.get("file_status", "UNKNOWN")
+    logger.info("Target file %s status: %s", file_obj["_id"], status)
+    if status == "PURGED":
+        raise JgiNotRestoredError(
+            f"{genome_acc} is still on tape (PURGED). Run the jgi_request_restore rule and download after "
+            "the restore has completed."
+        )
 
-            logger.info(f"Current file status from requery: {current_status}")
+    org_key, sub = restore_entry(org, file_obj)
+    payload = {"ids": {org_key: sub}, "send_mail": False, "api_version": "2"}
+    logger.info("Requesting download of %s", target_filename)
+    with request_with_retries(session, "POST", JDP_DOWNLOAD_URL, logger, json=payload,
+                              stream=True, timeout=180) as r:
+        if r.status_code != 200:
+            raise RuntimeError(f"Download failed: HTTP {r.status_code}: {r.text[:300]}")
+        written = 0
+        with open(temp_zip_file, "wb") as handle:
+            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    handle.write(chunk)
+                    written += len(chunk)
+    logger.info("Archive downloaded: %d bytes", written)
 
-            if current_status == "RESTORED":
-                logger.info("Files are successfully staged and RESTORED on disk!")
-                time.sleep(5)
-                break
-            elif current_status in ["EXPIRED", "ERROR"]:
-                raise RuntimeError(f"JGI file restoration failed with status: {current_status}")
-
-            time.sleep(60)
-        else:
-            raise TimeoutError("Timed out waiting for JGI tape archive file restoration to complete.")
-
-    # 9. Build the precise documentation-compliant download payload structure
-    file_sub_dict = {
-        "file_ids": [jamo_id]
-    }
-    if target_top_hit:
-        file_sub_dict["top_hit"] = target_top_hit
-    if target_portal_id:
-        file_sub_dict["mycocosm_portal_id"] = target_portal_id
-
-    download_payload = {
-        "ids": {
-            target_org_key: file_sub_dict
-        },
-        "send_mail": False,
-        "api_version": "2"
-    }
-
-    logger.info(f"Sending POST request to download archive with proper payload schema: {JDP_DOWNLOAD_URL}")
-    for download_attempt in range(1, MAX_API_ATTEMPTS + 1):
-        try:
-            with request_with_retries(
-                session,
-                "POST",
-                JDP_DOWNLOAD_URL,
-                json=download_payload,
-                stream=True,
-                timeout=180,
-                max_attempts=1,
-            ) as r:
-                logger.info(f"Download Response Status Code: {r.status_code}")
-                if r.status_code != 200:
-                    logger.error(f"Error response body: {r.text}")
-                r.raise_for_status()
-
-                downloaded_bytes = 0
-                with open(temp_zip_file, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-                            downloaded_bytes += len(chunk)
-                logger.info(f"Zip archive download complete. Total bytes written: {downloaded_bytes}")
-                break
-        except (requests.RequestException, OSError) as e:
-            if download_attempt == MAX_API_ATTEMPTS:
-                logger.error(f"Exception occurred during download: {e}")
-                raise
-            delay = min(RETRY_SLEEP_SECONDS * 2 ** (download_attempt - 1), 60)
-            logger.warning(
-                f"Download failed on attempt {download_attempt}/{MAX_API_ATTEMPTS}: {e}. "
-                f"Retrying in {delay}s..."
-            )
-            time.sleep(delay)
-
-    # 10. Extract target file from the downloaded zip archive
-    logger.info(f"Extracting target file '{target_filename}' from zip archive...")
-    extracted_successfully = False
     try:
-        with zipfile.ZipFile(temp_zip_file, 'r') as zf:
-            namelist = zf.namelist()
-            logger.debug(f"Files inside zip archive: {namelist}")
-            
-            matching_member = None
-            for member in namelist:
-                if Path(member).name == target_filename:
-                    matching_member = member
-                    break
-            
-            if not matching_member and len(namelist) == 1:
-                matching_member = namelist[0]
-
-            if matching_member:
-                source_in_zip = zf.open(matching_member)
-                with open(downloaded_file, "wb") as out_f:
-                    out_f.write(source_in_zip.read())
-                extracted_successfully = True
-            else:
-                raise RuntimeError(f"Target filename '{target_filename}' not found in zip archive contents: {namelist}")
-    except Exception as e:
-        logger.error(f"Failed to extract from zip archive: {e}")
-        raise e
+        with zipfile.ZipFile(temp_zip_file) as zf:
+            names = zf.namelist()
+            member = next((m for m in names if Path(m).name == target_filename), None)
+            if member is None and len(names) == 1:
+                member = names[0]
+            if member is None:
+                raise RuntimeError(f"{target_filename} not found in zip contents: {names}")
+            with zf.open(member) as src, open(downloaded_file, "wb") as dst:
+                shutil.copyfileobj(src, dst, 1024 * 1024)
     finally:
-        if temp_zip_file.exists():
-            temp_zip_file.unlink()
+        temp_zip_file.unlink(missing_ok=True)
 
-    if not extracted_successfully or not downloaded_file.exists() or downloaded_file.stat().st_size == 0:
-        logger.error("Extracted file is missing or 0 bytes.")
-        Path(output_file).touch()
+    if not downloaded_file.exists() or downloaded_file.stat().st_size == 0:
+        logger.error("Extracted file is missing or 0 bytes; writing an empty failure marker.")
+        downloaded_file.unlink(missing_ok=True)
+        output_file.touch()
         return
 
-    # 11. Validate Gzip integrity and finalize
-    if validate_gzip_file(downloaded_file):
-        logger.info(f"Renaming staging file to final output: '{output_file}'")
-        downloaded_file.rename(output_file)
-        logger.info(f"Successfully downloaded, verified, and placed genome for {genome_acc}")
-        return
+    if not validate_gzip_file(downloaded_file):
+        downloaded_file.unlink(missing_ok=True)
+        raise RuntimeError(f"Download failed for {genome_acc}: gzip verification failed.")
 
-    try:
-        downloaded_file.unlink()
-    except FileNotFoundError:
-        pass
-    raise Exception(f"Download failed for {genome_acc}: gzip verification failed.")
+    downloaded_file.replace(output_file)
+    logger.info("Downloaded, verified and placed genome for %s", genome_acc)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (JgiAuthError, JgiNotRestoredError) as exc:
+        logger.error("%s", exc)
+        raise SystemExit(1)

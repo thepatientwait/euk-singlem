@@ -8,6 +8,12 @@ groups:
 # (e.g. suppressed assemblies); set true to retry those on the next run.
 retry_failed_downloads: false
 
+# JGI genomes on tape (PURGED) cannot be downloaded until JGI restores them.
+# request_jgi_restores: send batched restore requests as part of the download phase
+# jgi_skip_purged: leave genomes that are still on tape out of the DAG (no queue time)
+request_jgi_restores: true
+jgi_skip_purged: true
+
 # JGI API URLs for metadata download
 jgi_config:
   fungi:

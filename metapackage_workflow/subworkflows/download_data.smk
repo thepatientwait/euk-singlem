@@ -54,9 +54,10 @@ ALL_GENOME_DOWNLOAD_TARGETS = build_all_genomes_to_download(
     # Genomes already on disk (including zero-byte failure markers) get no download job.
     # Set retry_failed_downloads: true in config.yaml to re-request the zero-byte ones.
     retry_failed=bool(config.get("retry_failed_downloads", False)),
+    skip_jgi_purged=bool(config.get("jgi_skip_purged", True)),
 )
 
-localrules: download_jgi_metadata, download_p10k_metadata, discover_ncbi_genomes, build_unified_manifest, fetch_ncbi_taxonomy, cleanup_failed_genomes, write_genome_manifest,
+localrules: download_jgi_metadata, jgi_request_restore, download_p10k_metadata, discover_ncbi_genomes, build_unified_manifest, fetch_ncbi_taxonomy, cleanup_failed_genomes, write_genome_manifest,
 
 
 rule all:
@@ -84,6 +85,27 @@ checkpoint download_jgi_metadata:
         str(SCRIPTS_DIR / "download_jgi_metadata.py")
 
 
+rule jgi_request_restore:
+    """Ask JGI to restore this group's missing tape (PURGED) genomes; does not wait for them.
+
+    Re-runs whenever the group metadata is refreshed, which re-requests anything still on tape.
+    """
+    input:
+        json = METADATA["jgi"]["json"]
+    output:
+        report = METADATA["jgi"]["restore_report"]
+    params:
+        token = config.get("jgi_token"),
+        batch_size = config.get("jgi_restore_batch_size", 50),
+        limit = config.get("jgi_restore_limit", 0)
+    threads: 1
+    resources: **DEFAULT_RESOURCES
+    log:
+        log_path("jgi_request_restore", "group")
+    script:
+        str(SCRIPTS_DIR / "jgi_request_restore.py")
+
+
 rule download_jgi_genome:
     input:
         json = METADATA["jgi"]["json"],
@@ -96,8 +118,10 @@ rule download_jgi_genome:
         source="JGI",
         token=config.get("jgi_token")
     threads: 1
-    retries: TOTAL_ATTEMPTS
-    resources: **DEFAULT_RESOURCES
+    # downloads only files already on disk at JGI (no tape wait): small and short; an auth
+    # error fails immediately and a transient error gets one retry
+    retries: 1
+    resources: **RESOURCE_PROFILE(mem_scale=0.25, runtime="1h")
     wildcard_constraints:
         group = "|".join(GROUPS)
     log:
@@ -268,7 +292,13 @@ rule cleanup_failed_genomes:
     input:
         # Only genomes still needing a download; being listed here is what triggers downloads.
         # Validation below covers every genome on disk, not just these.
-        genomes = ALL_GENOME_DOWNLOAD_TARGETS
+        genomes = ALL_GENOME_DOWNLOAD_TARGETS,
+        # ask JGI to restore tape genomes (set request_jgi_restores: false to skip, e.g. when
+        # only NCBI genomes are wanted and the JGI token is not current)
+        restore_requests = (
+            [METADATA["jgi"]["restore_report"].format(group=group) for group in GROUPS]
+            if config.get("request_jgi_restores", True) else []
+        )
     output:
         report = CLEANUP["report"],
         done   = CLEANUP["done_flag"]
