@@ -287,10 +287,11 @@ rule download_discovered_ncbi_genome:
     params:
         source = "NCBI"
     # CPUs double on every retry (only used for the NCBI Datasets fallback with pigz); memory
-    # stays fixed because the download is streamed
+    # stays fixed (8 GB) because the download is streamed. 2 GB was too little: the three
+    # 11-30 GB genomes died with "Cannot allocate memory".
     threads: get_threads(1)
     retries: TOTAL_ATTEMPTS
-    resources: **RESOURCE_PROFILE(mem_scale=0.5, fixed_mem=True)
+    resources: **RESOURCE_PROFILE(mem_scale=2, fixed_mem=True)
     log:
         log_path("download_discovered_ncbi_genome", "genome_acc")
     script:

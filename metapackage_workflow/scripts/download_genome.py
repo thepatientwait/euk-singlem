@@ -48,6 +48,19 @@ FTP_ATTEMPTS = 3
 GZIP_LEVEL = 6  # python's default of 9 is several times slower for little gain
 
 
+SYNC_EVERY_BYTES = 256 * 1024 * 1024
+
+
+def drop_page_cache(handle) -> None:
+    """Flush ``handle`` to disk and ask the kernel to forget its cached pages (best effort)."""
+    handle.flush()
+    try:
+        os.fsync(handle.fileno())
+        os.posix_fadvise(handle.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+    except (OSError, AttributeError):
+        pass
+
+
 def ftp_parent_url(accession: str) -> str | None:
     """Directory listing URL holding this accession's assembly folder, e.g. .../GCA/000/149/185/."""
     match = re.fullmatch(r"(GC[AF])_(\d{9})\.\d+", accession)
@@ -103,9 +116,18 @@ def download_ncbi_ftp(accession: str, output: Path) -> bool:
                 response.raise_for_status()
                 digest = hashlib.md5()
                 with output.open("wb") as handle:
+                    since_sync = 0
                     for chunk in response.iter_content(1024 * 1024):
                         handle.write(chunk)
                         digest.update(chunk)
+                        since_sync += len(chunk)
+                        if since_sync >= SYNC_EVERY_BYTES:
+                            # write the data out and drop it from the page cache: a 30 GB file
+                            # otherwise fills the job's memory limit with cached pages
+                            # ("Cannot allocate memory")
+                            drop_page_cache(handle)
+                            since_sync = 0
+                    drop_page_cache(handle)
             if md5 is not None and digest.hexdigest() != md5:
                 raise IOError(f"md5 mismatch for {file_name}: {digest.hexdigest()} != {md5}")
             logger.info("%s: downloaded %s from the NCBI FTP (%d bytes)", accession, file_name, output.stat().st_size)
