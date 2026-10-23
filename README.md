@@ -109,7 +109,16 @@ Outputs are under `output/{derep}/{copies}/`. FastTree runs with the protein mod
 - `tree_comparison` (once, `output/comparison/`): Robinson-Foulds distances between the trees,
   fragmentation side by side, single- vs multi-copy per-gene separation.
 
+The notebooks in `notebooks/` are templates; each rule writes an executed copy (`tree_diagnostics.ipynb`,
+`tree_accuracy.ipynb`, `tree_comparison.ipynb`) with its outputs and figures into the output folder.
 `scripts/tree_fragmentation.py` can also compare finished trees from the command line.
+
+`publish_trees` (part of `rule all`) copies the final trees and their metadata into a new
+`<tree.publish_dir>/<YYYY-MM-DD_HHMMSS>[_subset_<name>]/` directory (default `~/trees`; override with
+`--config publish_dir=...`): per `{derep}/{copies}` the `tree.nwk`, `tree.rerooted.nwk`, the RED-decorated
+tree and cutoffs, `tree_metadata.tsv`, the reference/target taxonomy and the executed notebooks, plus
+`MANIFEST.tsv` (size, md5), `RUN_INFO.txt` (git commit, settings) and a `latest` symlink. Every publish
+gets its own directory; it re-runs only when a published file changed.
 
 **Quick check on a subset.** `tree.subset` (or `--config subset=family5`) runs the whole workflow
 on a small genome set and writes to `output_subset_<name>/` so the full run is untouched:

@@ -168,7 +168,7 @@ MERGED_BMGE_TARGETS   = build_merged_bmge_targets_factory(TREE_PATHS, MERGED_GEN
 MERGED_TAXONOMY_INPUT = build_merged_taxonomy_input_factory(EXTERNAL_PATHS, METAPACKAGE_TAXONOMY, USE_EXTERNAL)
 
 
-localrules: make_subset_list, merge_gene_fastas, build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
+localrules: publish_trees, make_subset_list, merge_gene_fastas, build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
 
 # The tree is built once per {derep} x {copy} value:
 #   single Complete BUSCO genes only
@@ -199,6 +199,8 @@ def _abs(path):
 
 
 COMPARISON_DIR = ("output" if SUBSET == "none" else SUBSET_DIR) + "/comparison"
+PUBLISH_DIR = str(config.get("publish_dir", TREE_CONFIG.get("publish_dir", "~/trees")))   # `--config publish_dir=...` overrides
+PUBLISH_MARKER = ("output" if SUBSET == "none" else SUBSET_DIR) + "/published_to.txt"
 
 
 def derep_keep_list(wildcards):
@@ -209,9 +211,10 @@ rule all:
     input:
         expand(TREE_PATHS["rerooted_newick"], derep=DEREP_MODES, copies=COPY_MODES),
         expand(TAXONOMY_PATHS["metadata"], derep=DEREP_MODES, copies=COPY_MODES),
-        expand(TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.html", derep=DEREP_MODES, copies=COPY_MODES),
-        expand(TREE_PATHS["diagnostics_dir"] + "/tree_accuracy.html", derep=DEREP_MODES, copies=COPY_MODES),
-        COMPARISON_DIR + "/tree_comparison.html"
+        expand(TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.ipynb", derep=DEREP_MODES, copies=COPY_MODES),
+        expand(TREE_PATHS["diagnostics_dir"] + "/tree_accuracy.ipynb", derep=DEREP_MODES, copies=COPY_MODES),
+        COMPARISON_DIR + "/tree_comparison.ipynb",
+        PUBLISH_MARKER
 
 
 rule build_external_manifest_table:
@@ -596,25 +599,31 @@ rule generate_alignment:
 
 rule tree_diagnostics:
     """Executed notebook on the supermatrix (and trees, if built): occupancy, gene overlap and
-    divergence within vs between clades, clade fragmentation, multicopy heuristic check."""
+    divergence within vs between clades, per-gene separation, multicopy heuristic check."""
     input:
         alignment = TREE_PATHS["alignment"],
         partitions = TREE_PATHS["partitions"],
         taxonomy = TAXONOMY_PATHS["conservative"]
     output:
-        html = TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.html"
+        notebook = TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.ipynb"
     params:
         notebook = str(ROOT / "notebooks" / "tree_diagnostics.ipynb"),
-        scripts_dir = str(TREE_SCRIPTS),
-        # read if present when the notebook runs; not rule inputs, so the notebook never waits for the tree
-        trees = lambda wildcards: [TREE_PATHS["rerooted_newick"].format(derep=wildcards.derep, copies=wildcards.copies)],
-        merged_dir = lambda wildcards: str(Path(MERGED_PATHS["gene_faa"].format(derep=wildcards.derep, copies=wildcards.copies, gene="x")).parent),
-        busco_manifests = [
-            (str(METAPACKAGE_BUSCO_QC), str(METAPACKAGE_ROOT)),
-            (EXTERNAL_PATHS["metadata"]["busco_qc"], str(ROOT)),
-        ],
-        n_pairs = int(TREE_CONFIG.get("diagnostics_pairs", 2000)),
-        max_multicopy_cases = int(TREE_CONFIG.get("diagnostics_multicopy_cases", 400))
+        nb_params = lambda wildcards, input: {
+            "label": f"{wildcards.derep}/{wildcards.copies}" + ("" if SUBSET == "none" else f" (subset {SUBSET})"),
+            "scripts_dir": str(TREE_SCRIPTS.resolve()),
+            "alignment": str(Path(input.alignment).resolve()),
+            "partitions": str(Path(input.partitions).resolve()),
+            "taxonomy": str(Path(input.taxonomy).resolve()),
+            # read if present when the notebook runs; not a rule input, so it never waits for the tree
+            "trees": [str(Path(TREE_PATHS["rerooted_newick"].format(derep=wildcards.derep, copies=wildcards.copies)).resolve())],
+            "merged_dir": str(Path(MERGED_PATHS["gene_faa"].format(derep=wildcards.derep, copies=wildcards.copies, gene="x")).parent.resolve()),
+            "busco_manifests": [
+                {"manifest": str(Path(METAPACKAGE_BUSCO_QC).resolve()), "base": str(METAPACKAGE_ROOT.resolve())},
+                {"manifest": str(Path(EXTERNAL_PATHS["metadata"]["busco_qc"]).resolve()), "base": str(ROOT.resolve())},
+            ],
+            "n_pairs": int(TREE_CONFIG.get("diagnostics_pairs", 2000)),
+            "max_multicopy_cases": int(TREE_CONFIG.get("diagnostics_multicopy_cases", 400)),
+        }
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=2)
@@ -623,7 +632,7 @@ rule tree_diagnostics:
     conda:
         env("diagnostics")
     script:
-        str(TREE_SCRIPTS / "run_diagnostics_notebook.py")
+        str(TREE_SCRIPTS / "run_notebook.py")
 
 
 # Rooting-independent clade fragmentation, support of the fragmenting splits, misplaced tips and
@@ -636,7 +645,7 @@ rule tree_accuracy:
         red_cutoffs = TAXONOMY_PATHS["red_cutoffs"],
         reference = TAXONOMY_PATHS["reference"]
     output:
-        html = TREE_PATHS["diagnostics_dir"] + "/tree_accuracy.html"
+        notebook = TREE_PATHS["diagnostics_dir"] + "/tree_accuracy.ipynb"
     params:
         notebook = str(ROOT / "notebooks" / "tree_accuracy.ipynb"),
         nb_params = lambda wildcards, input: {
@@ -672,7 +681,7 @@ rule tree_comparison:
         partitions = expand(TREE_PATHS["partitions"], derep=DEREP_MODES, copies=COPY_MODES),
         taxonomy = TAXONOMY_PATHS["conservative"]
     output:
-        html = COMPARISON_DIR + "/tree_comparison.html"
+        notebook = COMPARISON_DIR + "/tree_comparison.ipynb"
     params:
         notebook = str(ROOT / "notebooks" / "tree_comparison.ipynb"),
         nb_params = lambda wildcards, input: {
@@ -696,6 +705,57 @@ rule tree_comparison:
         env("diagnostics")
     script:
         str(TREE_SCRIPTS / "run_notebook.py")
+
+
+# Snapshot of the final results: trees, taxonomy metadata and the executed notebooks are copied into
+# <tree.publish_dir>/<date_time>[_subset_<name>]/ (new directory per publish, never overwritten).
+# The marker output lives in the workflow directory, so the rule re-runs only when one of the
+# published files changed, not on every invocation.
+
+
+def _publish_pairs():
+    """[(source, destination inside the snapshot)] for every tree variant plus the shared files."""
+    pairs = []
+    for d in DEREP_MODES:
+        for c in COPY_MODES:
+            wc = dict(derep=d, copies=c)
+            out = f"{d}/{c}"
+            pairs += [
+                (TREE_PATHS["newick"].format(**wc), f"{out}/tree.nwk"),
+                (TREE_PATHS["rerooted_newick"].format(**wc), f"{out}/tree.rerooted.nwk"),
+                (TAXONOMY_PATHS["red_tree"].format(**wc), f"{out}/red_decorated.tree"),
+                (TAXONOMY_PATHS["red_cutoffs"].format(**wc), f"{out}/red_cutoffs.dict"),
+                (TAXONOMY_PATHS["metadata"].format(**wc), f"{out}/tree_metadata.tsv"),
+                (TAXONOMY_PATHS["reference"].format(**wc), f"{out}/taxonomy.revised_reference.tsv"),
+                (TAXONOMY_PATHS["target"].format(**wc), f"{out}/target_novelty_taxonomy.tsv"),
+                (TREE_PATHS["diagnostics_dir"].format(**wc) + "/tree_diagnostics.ipynb", f"{out}/notebooks/tree_diagnostics.ipynb"),
+                (TREE_PATHS["diagnostics_dir"].format(**wc) + "/tree_accuracy.ipynb", f"{out}/notebooks/tree_accuracy.ipynb"),
+            ]
+    pairs += [
+        (TAXONOMY_PATHS["conservative"], "conservative_taxonomy.tsv"),
+        (COMPARISON_DIR + "/tree_comparison.ipynb", "comparison/tree_comparison.ipynb"),
+    ]
+    return pairs
+
+
+rule publish_trees:
+    """Copy the final trees + metadata into a new date-time stamped directory (tree.publish_dir)."""
+    input:
+        files = [src for src, _ in _publish_pairs()]
+    output:
+        marker = PUBLISH_MARKER
+    params:
+        files = [(str(Path(src).resolve()), dst) for src, dst in _publish_pairs()],
+        publish_dir = PUBLISH_DIR,
+        subset = SUBSET,
+        repo = str(ROOT.resolve()),
+        info = {"derep_modes": DEREP_MODES, "copy_modes": COPY_MODES,
+                "fasttree_args": TREE_CONFIG.get("fasttree_args", "-lg -gamma"),
+                "workflow_dir": str(ROOT.resolve())}
+    log:
+        log_path("publish_trees")
+    script:
+        str(TREE_SCRIPTS / "publish_trees.py")
 
 
 rule build_tree:
