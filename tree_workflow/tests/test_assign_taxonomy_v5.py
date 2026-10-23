@@ -24,6 +24,22 @@ def run(newick, known, cutoffs=CUTOFFS):
     return parsed, {r["genome_id"] for r in tgt}, stats
 
 
+class TestMonotoneRed(unittest.TestCase):
+    def test_child_raised_to_parent_only_when_lower(self):
+        tree = at.read_red_tree("(((a:1,b:1)n3|RED=0.7:0.1,c:1)n2|RED=0.4:0.1,d:1)n1|RED=0.5:0.1;")
+        for n in tree.postorder_node_iter():
+            n.red = None if n.is_leaf() else at.parse_node_label(n)[1]
+        raised = at.enforce_monotone_red(tree)
+        reds = {n.label.split("|")[0]: n.red for n in tree.internal_nodes()}
+        self.assertEqual(raised, 1)
+        self.assertEqual(reds, {"n1": 0.5, "n2": 0.5, "n3": 0.7})
+
+    def test_assign_reports_the_count(self):
+        tree = at.read_red_tree("((a|RED_1:1,b|RED_1:1)x|RED_0.2:1,c|RED_1:1)root|RED_0.3:1;")
+        _, _, stats = at.assign_taxonomy(tree, {"a": "d__Eukarya;p__P;c__;o__;f__;g__;s__"}, CUTOFFS)
+        self.assertEqual(stats["red_raised_to_parent"], 1)
+
+
 class TestNegativeBranches(unittest.TestCase):
     def test_counts_negative_edges(self):
         tree = at.read_red_tree("((a:0.1,b:-0.2)x|RED=0.5:-0.05,c:0.3)root;")

@@ -120,7 +120,7 @@ def report_negative_branches(tree):
     if negative:
         print(f"NOTE: {len(negative)} branches have negative length in the PhyloRank RED tree "
               f"(most negative {min(negative):.4f}, total {sum(negative):.4f}). These are artefacts of "
-              "PhyloRank's RED rescaling; RED values themselves are used and are unaffected.")
+              "PhyloRank's RED rescaling; branch lengths are ignored and node RED values are used (made monotone, see below).")
     else:
         print("No negative branch lengths in the RED tree.")
     return len(negative), (min(negative) if negative else 0.0)
@@ -217,6 +217,28 @@ def annotate_internal_nodes(tree):
             if merged is MIXED:
                 break
         node.state = state
+
+
+def enforce_monotone_red(tree):
+    """Make RED non-decreasing from the root to the tips; returns the number of nodes raised.
+
+    PhyloRank's RED is the median over several rootings, which need not rise from a parent to
+    its child (that is also what produces negative branch lengths in the RED tree). A child
+    that is less diverged than its parent is meaningless for rank assignment, so each node's
+    RED is raised to at least its nearest ancestor's. Only the node RED values are used here,
+    never PhyloRank's rewritten branch lengths.
+    """
+    changed = 0
+    for node in tree.preorder_node_iter():
+        if node.is_leaf() or node.red is None:
+            continue
+        ancestor = node.parent_node
+        while ancestor is not None and getattr(ancestor, "red", None) is None:
+            ancestor = ancestor.parent_node
+        if ancestor is not None and node.red < ancestor.red:
+            node.red = ancestor.red
+            changed += 1
+    return changed
 
 
 # --------------------------------------------------------------------------
@@ -331,6 +353,7 @@ def assign_taxonomy(tree, known_tax, red_cutoffs):
     leaves = annotate_leaves(tree, known_tax)
     changes = harmonise_higher_ranks(leaves)
     annotate_internal_nodes(tree)
+    red_raised = enforce_monotone_red(tree)
 
     used_names = {rank: set() for rank in RANKS}
     for leaf in leaves:
@@ -343,6 +366,7 @@ def assign_taxonomy(tree, known_tax, red_cutoffs):
         "reference": len(reference),
         "target": len(target),
         "harmonised_changes": changes,
+        "red_raised_to_parent": red_raised,
         "internal_nodes_without_red": sum(
             1 for n in tree.internal_nodes() if n.red is None
         ),
@@ -396,6 +420,8 @@ def main():
         print(f"NOTE: {missing_from_tree} genomes in the taxonomy file are not in the tree.")
     if stats["harmonised_changes"]:
         print(f"Harmonised higher-rank labels (leaf labels changed, by rank): {stats['harmonised_changes']}")
+    if stats["red_raised_to_parent"]:
+        print(f"NOTE: RED raised to the parent's value on {stats['red_raised_to_parent']} nodes (non-monotone RED).")
     if stats["internal_nodes_without_red"]:
         print(f"WARNING: {stats['internal_nodes_without_red']} internal nodes have no RED value.")
 
