@@ -44,6 +44,50 @@ class TestMerge(unittest.TestCase):
         self.assertEqual(stats["dropped_not_kept"], 1)
 
 
+class TestCopyAndSubset(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        self.base = fasta(self.dir / "g.faa", {"A|g|1": "MK", "B|g|1": "MV", "C|g|1": "MM"})
+        (self.dir / "g_status.tsv").write_text("sequence_id\tstatus\tscore\nA|g|1\tComplete\t9\nB|g|1\tDuplicated\t8\nC|g|1\tComplete\t7\n")
+        (self.dir / "e").mkdir()
+        self.ext = fasta(self.dir / "e" / "g.faa", {"E|g|1": "MQ", "F|g|1": "MW"})
+        (self.dir / "e" / "g_status.tsv").write_text("sequence_id\tstatus\tscore\nE|g|1\tDuplicated\t5\nF|g|1\tComplete\t5\n")
+
+    def ids(self, **kw):
+        out = self.dir / "m.faa"
+        stats = mg.merge(self.base, self.ext, out, True, **kw)
+        return set(dict(mg.read_records(out))), stats
+
+    def test_multi_keeps_everything(self):
+        ids, _ = self.ids(copy="multi")
+        self.assertEqual(ids, {"A|g|1", "B|g|1", "C|g|1", "E|g|1", "F|g|1"})
+
+    def test_single_drops_duplicated_in_both_inputs(self):
+        ids, stats = self.ids(copy="single")
+        self.assertEqual(ids, {"A|g|1", "C|g|1", "F|g|1"})
+        self.assertEqual(stats["dropped_duplicated"], 2)
+
+    def test_subset_applies_to_base_and_external_keep_to_base_only(self):
+        ids, _ = self.ids(copy="multi", subset={"A", "E"})
+        self.assertEqual(ids, {"A|g|1", "E|g|1"})
+        ids, _ = self.ids(copy="multi", keep={"A"})
+        self.assertEqual(ids, {"A|g|1", "E|g|1", "F|g|1"})
+        ids, _ = self.ids(copy="single", keep={"A", "B"}, subset={"A", "B", "F"})
+        self.assertEqual(ids, {"A|g|1", "F|g|1"})
+
+    def test_missing_sidecar_counts_everything_as_complete(self):
+        (self.dir / "g_status.tsv").unlink()
+        ids, stats = self.ids(copy="single")
+        self.assertIn("B|g|1", ids)
+        self.assertEqual(stats["no_sidecar"], 1)
+
+    def test_bad_copy(self):
+        with self.assertRaises(ValueError):
+            self.ids(copy="both")
+
+
 class TestAlignment(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

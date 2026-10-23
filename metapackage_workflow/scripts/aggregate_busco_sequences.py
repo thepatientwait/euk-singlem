@@ -130,6 +130,7 @@ def extract_gene_sequences(busco_file: Path, selected_genes: pl.DataFrame,
                 'busco_id': busco_id,
                 'copy_number': copy_number,
                 'score': row['Score'],
+                'status': row.get('Status', 'Complete'),
                 'length': len(record.seq),
             }
             sequences_found += 1
@@ -412,6 +413,18 @@ def write_gene_fasta(busco_id: str, deduplicated_sequences: Dict, output_dir: Pa
     return fasta_file
 
 
+def write_status_file(busco_id: str, deduplicated_sequences: Dict, output_dir: Path) -> Path:
+    """Sidecar ``<gene>_status.tsv`` (sequence_id, status, score): was the sequence a Complete
+    BUSCO or the top copy of a Duplicated one? Lets the tree workflow build single-copy and
+    multicopy trees from the same aggregation."""
+    status_file = output_dir / f"{busco_id}_status.tsv"
+    with open(status_file, 'w') as f:
+        f.write("sequence_id\tstatus\tscore\n")
+        for seq_id, info in deduplicated_sequences.items():
+            f.write(f"{seq_id}\t{info.get('status', 'Complete')}\t{info.get('score', '')}\n")
+    return status_file
+
+
 def write_taxonomy_file(busco_id: str, deduplicated_sequences: Dict, 
                        usable_taxonomy: Dict[str, str], output_dir: Path) -> Path:
     """
@@ -615,6 +628,7 @@ def write_gene_files(gene_sequences: Dict[str, Dict], usable_taxonomy: Dict[str,
                 
                 # Write taxonomy file with same deduplicated sequences
                 tax_file = write_taxonomy_file(busco_id, deduplicated_seqs, usable_taxonomy, output_dir)
+                write_status_file(busco_id, deduplicated_seqs, output_dir)
                 
                 processed_genes.append(busco_id)
                 logger.debug(f"Wrote files for {busco_id} ({len(deduplicated_seqs)} unique sequences)")
@@ -663,7 +677,7 @@ def main():
     # Create output directory. Files of genes/genomes from earlier runs would otherwise stay
     # behind and be picked up by later steps, so start from an empty set of aggregated files.
     output_dir.mkdir(parents=True, exist_ok=True)
-    for stale in list(output_dir.glob("*.faa")) + list(output_dir.glob("*_taxonomy.tsv")):
+    for stale in list(output_dir.glob("*.faa")) + list(output_dir.glob("*_taxonomy.tsv")) + list(output_dir.glob("*_status.tsv")):
         stale.unlink()
     genome_input_dir_early = Path(snakemake.output.genome_input_genomes).parent
     for stale in (genome_input_dir_early / "genomes").glob("*.faa"):

@@ -40,7 +40,6 @@ EUKCC_CONFIG       = config["eukcc"]
 NCBI_CONFIG        = config["ncbi"]
 ALIGNMENT_CONFIG   = config["alignment"]
 TAXONOMY_CONFIG    = config["taxonomy"]
-TREE_CONFIG        = config.get("tree", {})
 RESOURCE_CONFIG    = config["resources"]
 WORKFLOW_PATHS     = config["paths"]
 BASE_MEM_MB        = int(RESOURCE_CONFIG.get("base_mem_mb", 8000))
@@ -70,6 +69,33 @@ EXTERNAL_PATHS = WORKFLOW_PATHS["external"]
 MERGED_PATHS   = WORKFLOW_PATHS["merged"]
 TREE_PATHS     = WORKFLOW_PATHS["tree"]
 TAXONOMY_PATHS = WORKFLOW_PATHS["taxonomy"]
+TREE_CONFIG    = config.get("tree", {})
+
+# Quick-check subset (tree.subset or `--config subset=family5`): the {derep}/{copy} outputs go
+# to output_subset_<name>/ so a subset run never touches the full run; shared inputs
+# (external BUSCO, taxonomy) stay in output/.
+SUBSET     = str(config.get("subset", TREE_CONFIG.get("subset", "none")))
+SUBSET_DIR = f"output_subset_{SUBSET}"
+
+
+def _subset_root(templates):
+    if SUBSET == "none":
+        return dict(templates)
+    return {k: (v.replace("output/", SUBSET_DIR + "/", 1) if v.startswith("output/{derep}") else v)
+            for k, v in templates.items()}
+
+
+MERGED_PATHS   = _subset_root(MERGED_PATHS)
+TREE_PATHS     = _subset_root(TREE_PATHS)
+TAXONOMY_PATHS = _subset_root(TAXONOMY_PATHS)
+
+# per-subset log directories so subset and full runs do not overwrite each other's logs
+_base_log_path = log_path
+
+
+def log_path(rule_name, *wildcards):
+    path = _base_log_path(rule_name, *wildcards)
+    return path if SUBSET == "none" else path.replace("logs/", f"logs/subset_{SUBSET}/", 1)
 EUKCC_DB_PATHS = WORKFLOW_PATHS["eukcc_db"]
 BUSCO_DOWNLOAD_PATH = str((ROOT / "busco_downloads").resolve())
 BUSCO_LINEAGE_READY = str((ROOT / "output" / "external" / "metadata" / f".busco_lineage_{BUSCO_CONFIG['lineage']}.ready").resolve())
@@ -142,16 +168,20 @@ MERGED_BMGE_TARGETS   = build_merged_bmge_targets_factory(TREE_PATHS, MERGED_GEN
 MERGED_TAXONOMY_INPUT = build_merged_taxonomy_input_factory(EXTERNAL_PATHS, METAPACKAGE_TAXONOMY, USE_EXTERNAL)
 
 
-localrules: merge_gene_fastas, tree_diagnostics, build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
+localrules: make_subset_list, merge_gene_fastas, tree_diagnostics, build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
 
-# The tree is built once per {derep} value:
+# The tree is built once per {derep} x {copy} value:
+#   single Complete BUSCO genes only
+#   multi  Complete genes plus the top-scoring copy of Duplicated ones (sidecar <gene>_status.tsv)
+# and once per {derep} value:
 #   all    every genome of the metapackage input (+ external genomes)
 #   derep  only the dereplicated representatives (+ external genomes, which are already ANI clusters)
 # The representatives list comes from the metapackage workflow; create it with
 #   (cd ../metapackage_workflow && snakemake -s subworkflows/generate_metapackage.smk \
 #        outputs/metadata/qc/dereplicated_genome_representatives.txt)
 wildcard_constraints:
-    derep = "derep|all"
+    derep = "derep|all",
+    copies = "single|multi"
 
 DEREP_REPRESENTATIVES = Path(METAPACKAGE_CONFIG["derep_representatives"])
 DEREP_MODES = list(TREE_CONFIG.get("derep_modes", ["all", "derep"]))
@@ -161,15 +191,18 @@ if "derep" in DEREP_MODES and not DEREP_REPRESENTATIVES.exists():
     DEREP_MODES.remove("derep")
 
 
+COPY_MODES = list(TREE_CONFIG.get("copy_modes", ["single", "multi"]))
+
+
 def derep_keep_list(wildcards):
     return str(DEREP_REPRESENTATIVES) if wildcards.derep == "derep" else []
 
 
 rule all:
     input:
-        expand(TREE_PATHS["rerooted_newick"], derep=DEREP_MODES),
-        expand(TAXONOMY_PATHS["metadata"], derep=DEREP_MODES),
-        expand(TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.html", derep=DEREP_MODES)
+        expand(TREE_PATHS["rerooted_newick"], derep=DEREP_MODES, copies=COPY_MODES),
+        expand(TAXONOMY_PATHS["metadata"], derep=DEREP_MODES, copies=COPY_MODES),
+        expand(TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.html", derep=DEREP_MODES, copies=COPY_MODES)
 
 
 rule build_external_manifest_table:
@@ -413,11 +446,65 @@ checkpoint aggregate_external_busco_sequences:
 
 
 
+SUBSET_GENOMES     = f"{SUBSET_DIR}/subset_genomes.txt"
+SUBSET_QC          = f"{SUBSET_DIR}/subset_busco_manifest.tsv"
+SUBSET_GENOME_LIST = f"{SUBSET_DIR}/singlem_genome_input/genome_protein_files.txt"
+
+if SUBSET != "none":
+    rule make_subset_list:
+        """Random/targeted subset of genomes for quick checks (tree.subset)."""
+        input:
+            base_qc = str(METAPACKAGE_BUSCO_QC),
+            external_qc = EXTERNAL_PATHS["metadata"]["busco_qc"],
+            taxonomy = str(METAPACKAGE_TAXONOMY)
+        output:
+            genomes = SUBSET_GENOMES,
+            manifest = SUBSET_QC
+        params:
+            mode = SUBSET,
+            per_family = int(TREE_CONFIG.get("subset_per_family", 5)),
+            n_external = int(TREE_CONFIG.get("subset_external", 50)),
+            seed = int(TREE_CONFIG.get("subset_seed", 1)),
+            base_dir = str(METAPACKAGE_ROOT),
+            external_dir = str(ROOT)
+        log:
+            log_path("make_subset_list")
+        script:
+            str(TREE_SCRIPTS / "subset_genomes.py")
+
+
+    rule aggregate_subset_busco_sequences:
+        """Aggregate the BUSCO genes of the subset's base genomes (with the Complete/Duplicated
+        sidecar), so a subset run needs no re-aggregation of the full 8.9k-genome input."""
+        input:
+            busco_manifest = SUBSET_QC,
+            taxonomy = str(METAPACKAGE_TAXONOMY)
+        output:
+            sequences_dir = directory(f"{SUBSET_DIR}/singlem_input"),
+            genome_input_genomes = SUBSET_GENOME_LIST,
+            genome_input_hmms = f"{SUBSET_DIR}/singlem_genome_input/hmms_and_names_busco.tsv"
+        params:
+            min_sequences_per_gene = int(AGGREGATION_CONFIG.get("min_sequences_per_gene", 1)),
+            allow_missing_taxonomy = True,
+            use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False))
+        threads: 8
+        retries: TOTAL_ATTEMPTS
+        resources: **DEFAULT_RESOURCES
+        log:
+            log_path("aggregate_subset_busco_sequences")
+        script:
+            str(METAPACKAGE_SCRIPTS / "aggregate_busco_sequences.py")
+
+
 rule merge_gene_fastas:
     input:
-        base_faa      = lambda wildcards: str(METAPACKAGE_SINGLEM_INPUT_DIR / f"{wildcards.gene}.faa"),
+        # the base per-gene file (full run) or the marker of the subset aggregation
+        base_ready    = lambda wildcards: (SUBSET_GENOME_LIST if SUBSET != "none"
+                                           else str(METAPACKAGE_SINGLEM_INPUT_DIR / f"{wildcards.gene}.faa")),
         # dereplicated tree: only these genomes are taken from the base input
         keep          = derep_keep_list,
+        # quick-check subset: restricts base and external genomes
+        subset_list   = lambda wildcards: SUBSET_GENOMES if SUBSET != "none" else [],
         # Use a file output (not the directory output) as the checkpoint dependency.
         # The sequences_dir can be pre-created during setup, which would otherwise
         # let Snakemake skip actual aggregation.
@@ -425,12 +512,15 @@ rule merge_gene_fastas:
     output:
         merged_faa = MERGED_PATHS["gene_faa"]
     params:
+        base_faa = lambda wildcards: (str(Path(SUBSET_DIR) / "singlem_input" / f"{wildcards.gene}.faa")
+                                      if SUBSET != "none" else str(METAPACKAGE_SINGLEM_INPUT_DIR / f"{wildcards.gene}.faa")),
         external_faa = lambda wildcards: str(EXTERNAL_GENE_PATH(wildcards.gene)),
-        use_external = USE_EXTERNAL
+        use_external = USE_EXTERNAL,
+        copy_mode = lambda wildcards: wildcards.copies
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("merge_gene_fastas", "derep", "gene")
+        log_path("merge_gene_fastas", "derep", "copies", "gene")
     script:
         str(TREE_SCRIPTS / "merge_gene_fastas.py")
 
@@ -446,7 +536,7 @@ rule famsa:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(runtime="4h")
     log:
-        log_path("famsa", "derep", "gene")
+        log_path("famsa", "derep", "copies", "gene")
     conda:
         env("align")
     shell:
@@ -468,7 +558,7 @@ rule bmge:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("bmge", "derep", "gene")
+        log_path("bmge", "derep", "copies", "gene")
     conda:
         env("align")
     shell:
@@ -490,7 +580,7 @@ rule generate_alignment:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("generate_alignment", "derep")
+        log_path("generate_alignment", "derep", "copies")
     script:
         str(TREE_SCRIPTS / "generate_alignment.py")
 
@@ -508,8 +598,8 @@ rule tree_diagnostics:
         notebook = str(ROOT / "notebooks" / "tree_diagnostics.ipynb"),
         scripts_dir = str(TREE_SCRIPTS),
         # read if present when the notebook runs; not rule inputs, so the notebook never waits for the tree
-        trees = lambda wildcards: [TREE_PATHS["rerooted_newick"].format(derep=wildcards.derep)],
-        merged_dir = lambda wildcards: str(Path(MERGED_PATHS["gene_faa"].format(derep=wildcards.derep, gene="x")).parent),
+        trees = lambda wildcards: [TREE_PATHS["rerooted_newick"].format(derep=wildcards.derep, copies=wildcards.copies)],
+        merged_dir = lambda wildcards: str(Path(MERGED_PATHS["gene_faa"].format(derep=wildcards.derep, copies=wildcards.copies, gene="x")).parent),
         busco_manifests = [
             (str(METAPACKAGE_BUSCO_QC), str(METAPACKAGE_ROOT)),
             (EXTERNAL_PATHS["metadata"]["busco_qc"], str(ROOT)),
@@ -520,7 +610,7 @@ rule tree_diagnostics:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=2)
     log:
-        log_path("tree_diagnostics", "derep")
+        log_path("tree_diagnostics", "derep", "copies")
     conda:
         env("diagnostics")
     script:
@@ -540,7 +630,7 @@ rule build_tree:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(runtime=str(TREE_CONFIG.get("fasttree_runtime", "8h")))
     log:
-        log_path("build_tree", "derep")
+        log_path("build_tree", "derep", "copies")
     conda:
         env("align")
     shell:
@@ -559,7 +649,7 @@ if OUTGROUP_ENABLED:
         retries: TOTAL_ATTEMPTS
         resources: **DEFAULT_RESOURCES
         log:
-            log_path("reroot_tree", "derep")
+            log_path("reroot_tree", "derep", "copies")
         conda:
             env("taxonomy")
         run:
@@ -609,7 +699,7 @@ else:
         retries: TOTAL_ATTEMPTS
         resources: **DEFAULT_RESOURCES
         log:
-            log_path("reroot_tree", "derep")
+            log_path("reroot_tree", "derep", "copies")
         conda:
             env("taxonomy")
         run:
@@ -675,7 +765,7 @@ rule phylorank_decorate:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("phylorank_decorate", "derep")
+        log_path("phylorank_decorate", "derep", "copies")
     conda:
         env("taxonomy")
     shell:
@@ -696,11 +786,11 @@ rule phylorank_red:
         red_cutoffs = TAXONOMY_PATHS["red_cutoffs"]
     params:
         command = TAXONOMY_CONFIG["phylorank_command"],
-        red_dir = lambda wildcards: TAXONOMY_PATHS["red_dir"].format(derep=wildcards.derep)
+        red_dir = lambda wildcards: TAXONOMY_PATHS["red_dir"].format(derep=wildcards.derep, copies=wildcards.copies)
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("phylorank_red", "derep")
+        log_path("phylorank_red", "derep", "copies")
     conda:
         env("taxonomy")
     shell:
@@ -727,7 +817,7 @@ rule assign_taxonomy:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("assign_taxonomy", "derep")
+        log_path("assign_taxonomy", "derep", "copies")
     conda:
         env("taxonomy")
     script:
@@ -743,7 +833,7 @@ rule generate_metadata:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("generate_metadata", "derep")
+        log_path("generate_metadata", "derep", "copies")
     conda:
         env("taxonomy")
     script:

@@ -59,5 +59,20 @@ class TestTopHit(unittest.TestCase):
             self.assertEqual(qc._count_complete_markers(self.table, multi), len(self.selected(multi)))
 
 
+class TestStatusSidecar(unittest.TestCase):
+    def test_sidecar_lists_status_per_sequence(self):
+        seqs = {
+            "A|g|1": {"sequence": ">x\nMK", "sequence_id": "A|g|1", "genome_acc": "A", "busco_id": "g",
+                      "status": "Complete", "score": 100.0},
+            "B|g|1": {"sequence": ">x\nMK", "sequence_id": "B|g|1", "genome_acc": "B", "busco_id": "g",
+                      "status": "Duplicated", "score": 80.0},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = ab.write_status_file("g", seqs, Path(tmp))
+            lines = path.read_text().splitlines()
+        self.assertEqual(lines[0], "sequence_id\tstatus\tscore")
+        self.assertEqual(lines[1:], ["A|g|1\tComplete\t100.0", "B|g|1\tDuplicated\t80.0"])
+
+
 if __name__ == "__main__":
     unittest.main()
