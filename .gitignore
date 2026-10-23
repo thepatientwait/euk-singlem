@@ -1,6 +1,7 @@
 # Generated workflow outputs and caches
 **/output/
 **/outputs/
+**/output_subset_*/
 **/.snakemake/
 **/.pixi/
 **/__pycache__/
