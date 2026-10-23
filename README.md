@@ -61,6 +61,21 @@ Notes:
   `.OU`/`.ER` files still go to `~/qsub_logs` (check those for jobs killed before they
   wrote anything, e.g. out of memory).
 
+- **JGI downloads.** Files on JGI tape (`PURGED`) must be restored by JGI first (up to ~24 h).
+  `jgi_request_restore` sends one batched request per group; every missing genome then gets
+  a `download_jgi_genome` job that polls JGI every `jgi_poll_minutes` (15) and downloads as
+  soon as the file is restored. Attempts run 2 h, 4 h and 6 h (~12 h, about the life of the
+  token); it re-reads `config/secrets.yaml` before each authenticated call, so a fresh token
+  can be pasted in while jobs wait. Downloads run at most `jgi_max_concurrent` (10) at a
+  time (`--resources jgi_api=N`, set by the orchestrator); waiting jobs do not count.
+  `outputs/metadata/reports/jgi_not_ready.{group}.tsv` lists what is still missing and why.
+  The JGI file lists are **not** re-fetched automatically: refresh them with
+  `snakemake --forcerun download_jgi_metadata` (or delete `outputs/metadata/source/jgi/*.json`);
+  they are only rewritten if their content changed.
+- NCBI genomes are fetched as the already-gzipped `*_genomic.fna.gz` from the NCBI FTP
+  (md5-checked) and fall back to NCBI Datasets (compressed with pigz, CPUs double per retry).
+- `busco.quality_control.use_multi_copy: true` keeps Duplicated BUSCO genes, each represented
+  by its top-scoring copy (one sequence per gene per genome, never several copies).
 - The NCBI/P10K/JGI sources are consolidated by `scripts/build_unified_manifest.py`;
   `scripts/ncbi_taxid_resolver.py` and `scripts/fetch_ncbi_taxonomy.py` resolve
   taxonomy (Datasets API with Entrez fallback for replaced/suppressed assemblies).
@@ -72,6 +87,19 @@ cd tree_workflow
 pixi install --all   # once: default (driver) + busco, eukcc, align, taxonomy envs
 pixi run snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda -n
 ```
+
+Trees are built once per `{derep}` value (`tree.derep_modes` in `config.yaml`): `all`
+(every genome of the metapackage input plus the external genomes) and `derep` (only the
+representatives listed in `metapackage_workflow/outputs/metadata/qc/dereplicated_genome_representatives.txt`,
+made by the metapackage rule `dereplicate_genomes`; the external genomes are always kept).
+Outputs are under `output/{derep}/`. FastTree runs with the protein model (`tree.fasttree_args`,
+default `-lg -gamma`). The rule `tree_diagnostics` executes `notebooks/tree_diagnostics.ipynb`
+after the alignment (`output/{derep}/diagnostics/tree_diagnostics.html`): gene occupancy,
+gene overlap and sequence divergence within vs between clades, per-gene separation, clade
+fragmentation (`scripts/tree_fragmentation.py` can also compare finished trees) and a check
+of the multicopy top-hit heuristic.
+Negative branch lengths in the PhyloRank RED tree are artefacts of its RED rescaling (counted
+in the `assign_taxonomy` log); RED values themselves are unaffected.
 
 Config: `config.yaml` (metapackage inputs, `external` genomes, `outgroup`,
 BUSCO, EukCC, alignment, taxonomy) and `paths.yaml`. Example inputs are
