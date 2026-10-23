@@ -150,8 +150,13 @@ def build_merged_genes_factory(valid_genes: list[str], checkpoints, use_external
                     external_genes = [path.stem for path in seq_dir.glob("*.faa")]
                     if external_genes:
                         genes.update(external_genes)
-            except Exception:
-                # Checkpoint not available during DAG construction; rely on valid_genes only
+            except Exception as exc:
+                # IncompleteCheckpointException must propagate so Snakemake schedules the
+                # checkpoint and re-evaluates this input function afterwards. Swallowing it
+                # yields an empty gene list and an alignment built from zero inputs.
+                if type(exc).__name__ == "IncompleteCheckpointException":
+                    raise
+                # Other errors: rely on valid_genes only
                 pass
         return sorted(genes)
 

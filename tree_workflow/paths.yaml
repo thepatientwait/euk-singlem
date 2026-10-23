@@ -12,6 +12,7 @@ paths:
       manifest_table: "output/external/metadata/external_genomes.tsv"
       busco_qc: "output/external/metadata/busco_quality_control_results.tsv"
       checkm2: "output/external/metadata/checkm2_quality_report.tsv"
+      taxid_manifest: "output/external/metadata/taxid_manifest.tsv"
       ncbi_rebuilt_taxonomy: "output/external/metadata/taxonomy_mapping_rebuilt.tsv"
       eukcc_summary: "output/external/metadata/eukcc_summary.tsv"
     busco:

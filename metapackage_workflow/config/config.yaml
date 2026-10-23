@@ -42,6 +42,7 @@ ncbi:
 singlem:
   target_domains: 'Eukaryota'
   min_sequences_per_gene: 5
+  allow_missing_taxonomy: false  # true keeps sequences/genomes without a usable taxonomy
   derep:
     enabled: false
     precluster_ani: 90

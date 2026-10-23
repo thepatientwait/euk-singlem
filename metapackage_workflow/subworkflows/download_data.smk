@@ -236,7 +236,7 @@ rule fetch_ncbi_taxonomy:
     log:
         log_path("fetch_ncbi_taxonomy")
     script:
-        str(SCRIPTS_DIR / "fetch_ncbi_taxonomy_v2.py")
+        str(SCRIPTS_DIR / "fetch_ncbi_taxonomy.py")
 
 
 # rule cleanup_failed_genomes:
@@ -403,16 +403,14 @@ rule write_genome_manifest:
             genome_paths = get_existing_genome_paths_from_metadata(GROUPS)
 
             taxonomy_df = pl.read_csv(input.taxonomy, separator='\t')
-            if "acc" not in taxonomy_df.columns or "parsed_taxon_string" not in taxonomy_df.columns:
+            if "acc" not in taxonomy_df.columns or "tax_status" not in taxonomy_df.columns:
                 raise ValueError(
-                    f"Taxonomy mapping file missing required columns: {input.taxonomy}"
+                    f"Taxonomy mapping {input.taxonomy} lacks 'acc'/'tax_status' columns; "
+                    "regenerate it with the fetch_ncbi_taxonomy rule"
                 )
 
             taxonomy_exact = set(
-                taxonomy_df
-                .filter(pl.col("parsed_taxon_string").is_not_null() & (pl.col("parsed_taxon_string") != ""))
-                ["acc"]
-                .to_list()
+                taxonomy_df.filter(pl.col("tax_status").is_in(["complete", "partial"]))["acc"].to_list()
             )
 
             valid_genome_paths = []

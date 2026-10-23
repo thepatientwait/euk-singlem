@@ -26,25 +26,7 @@ DATASETS_BASE = 'https://api.ncbi.nlm.nih.gov/datasets/v2'
 EUTILS_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
 # The genome dataset_report POST endpoint returns at most 20 reports per call.
 DATASETS_POST_BATCH = 20
-# Taxonomy dataset_report accepts larger id lists.
-DATASETS_TAX_BATCH = 100
 RATE_LIMIT_SLEEP = 0.4
-
-# GTDB-style rank order used across this workflow.
-_LINEAGE_RANKS = ['domain', 'phylum', 'class', 'order', 'family', 'genus', 'species']
-_LINEAGE_PREFIXES = ['d__', 'p__', 'c__', 'o__', 'f__', 'g__', 's__']
-
-_DATASETS_RANK_MAP = {
-    'superkingdom': 'domain',
-    'domain': 'domain',
-    'kingdom': None,  # not represented in the GTDB-style strings used here
-    'phylum': 'phylum',
-    'class': 'class',
-    'order': 'order',
-    'family': 'family',
-    'genus': 'genus',
-    'species': 'species',
-}
 
 
 def base_accession(acc: str) -> str:
@@ -254,47 +236,3 @@ def resolve_accessions_to_taxids(accessions: List[str], email: str) -> Dict[str,
 def lookup_taxid(acc_to_taxid: Dict[str, Tuple[str, str, str]], acc: str):
     """Version-insensitive lookup; returns (tax_id, name, current_acc) or None."""
     return acc_to_taxid.get(acc) or acc_to_taxid.get(base_accession(acc))
-
-
-def fetch_lineages(tax_ids: List[str]) -> Dict[str, str]:
-    """
-    Fetch lineages for tax IDs via the Datasets taxonomy API.
-
-    Returns dict: tax_id (str) -> GTDB-style lineage string
-    (d__...;p__...;c__...;o__...;f__...;g__...;s__...).
-    """
-    tax_ids = sorted({str(t) for t in tax_ids if t})
-    lineage_map: Dict[str, str] = {}
-
-    for start in range(0, len(tax_ids), DATASETS_TAX_BATCH):
-        chunk = tax_ids[start:start + DATASETS_TAX_BATCH]
-        try:
-            data = _http_json(
-                f'{DATASETS_BASE}/taxonomy/taxon/{",".join(chunk)}/dataset_report')
-        except Exception as exc:
-            logger.warning('Datasets taxonomy query failed for chunk starting %s: %s',
-                           chunk[0] if chunk else '?', exc)
-            time.sleep(RATE_LIMIT_SLEEP * 2)
-            continue
-
-        for report in data.get('reports', []):
-            taxonomy = report.get('taxonomy', {}) or {}
-            tax_id = str(taxonomy.get('tax_id', '') or '')
-            if not tax_id:
-                continue
-
-            lineage_parts = {}
-            classification = taxonomy.get('classification', {}) or {}
-            for rank, item in classification.items():
-                mapped = _DATASETS_RANK_MAP.get(rank.lower())
-                if mapped and isinstance(item, dict):
-                    lineage_parts[mapped] = item.get('name') or ''
-
-            lineage_map[tax_id] = ';'.join(
-                f'{prefix}{lineage_parts.get(rank, "")}'
-                for rank, prefix in zip(_LINEAGE_RANKS, _LINEAGE_PREFIXES)
-            )
-
-        time.sleep(RATE_LIMIT_SLEEP)
-
-    return lineage_map

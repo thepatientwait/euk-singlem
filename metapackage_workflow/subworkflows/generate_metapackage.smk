@@ -297,7 +297,9 @@ checkpoint aggregate_busco_sequences:
         genome_input_hmms    = SINGLEM["genome_input"]["hmms_and_names"]
     params:
         min_sequences_per_gene = config["singlem"]["min_sequences_per_gene"],
-        use_multi_copy = config["busco"]["quality_control"].get("use_multi_copy", False)
+        use_multi_copy = config["busco"]["quality_control"].get("use_multi_copy", False),
+        # Keep sequences/genomes lacking a usable taxonomy (default: exclude them)
+        allow_missing_taxonomy = config["singlem"].get("allow_missing_taxonomy", False)
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     threads: 16

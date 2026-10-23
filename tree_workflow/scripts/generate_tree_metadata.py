@@ -68,7 +68,21 @@ def determine_novelty(frame: pl.DataFrame) -> pl.DataFrame:
 
 
 def read_taxonomy(path: Path, source: str, novelty: str | None = None) -> pl.DataFrame:
-    frame = pl.read_csv(path, separator="\t")
+    # assign_taxonomy_v5 writes headerless two-column TSVs (genome_id, taxonomy).
+    # Older versions wrote a header (and optionally a "novelty" column); accept both.
+    with open(path) as handle:
+        first_line = handle.readline().rstrip("\n")
+    has_header = first_line.split("\t")[0] == "genome_id"
+
+    if has_header:
+        frame = pl.read_csv(path, separator="\t")
+    else:
+        frame = pl.read_csv(path, separator="\t", has_header=False)
+        if frame.width < 2:
+            raise ValueError(f"{path} must have at least 2 tab-separated columns (genome_id, taxonomy)")
+        names = ["genome_id", "taxonomy"] + [f"extra_{i}" for i in range(frame.width - 2)]
+        frame = frame.rename(dict(zip(frame.columns, names)))
+
     expected = {"genome_id", "taxonomy"}
     missing = expected.difference(frame.columns)
     if missing:

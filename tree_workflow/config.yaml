@@ -1,7 +1,7 @@
 metapackage:
   singlem_input_dir: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input"
   valid_packages_manifest: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/euk_packages/valid_singlem_packages.txt"
-  taxonomy_mapping: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/metadata/taxonomy_mapping.tsv"
+  taxonomy_mapping: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/metadata/taxonomy/taxonomy_mapping.tsv"
 
 external:
   enabled: true
@@ -12,17 +12,18 @@ external:
   ncbi_taxid_map: "inputs/external_genome_taxids.tsv"
 
 outgroup:
-  enabled: true
+  enabled: false
   name: "outgroup"
   genome_manifest: "metadata/asgard_genomes.csv"
 
 busco:
   lineage: "eukaryota_odb12"
   mode: "genome"
-  min_complete_markers: 1
+  min_complete_markers: 20
 
 aggregation:
-  min_sequences_per_gene: 1
+  min_sequences_per_gene: 20
+  allow_missing_taxonomy: true  # keep genomes/sequences without taxonomy (needed for tree building)
 
 eukcc:
   threads: 2

@@ -29,8 +29,8 @@ TAXONOMY_OTU        = snakemake.output['taxonomy_otu']
 # functions
 # ---------
 UNKNOWN_TAXONOMY = (
-    "d__Eukarya; p__unclassified; c__unclassified; "
-    "o__unclassified; f__unclassified; g__unclassified; s__unclassified"
+    "d__Eukarya;p__unclassified;c__unclassified;"
+    "o__unclassified;f__unclassified;g__unclassified;s__unclassified"
 )
 
 
@@ -41,6 +41,13 @@ def _normalize_accession(genome_acc: str) -> str:
 
 def get_taxon_string(file_path, genome_acc):
     mapping_df = pl.read_csv(file_path, separator='\t')
+    if 'tax_status' not in mapping_df.columns:
+        raise ValueError(
+            f"Taxonomy mapping {file_path} has no 'tax_status' column; "
+            "regenerate it with the fetch_ncbi_taxonomy rule"
+        )
+    # Only genomes with a usable taxonomy count as having one (otherwise: placeholder below)
+    mapping_df = mapping_df.filter(pl.col('tax_status').is_in(['complete', 'partial']))
 
     # 1) Exact accession match first.
     exact = mapping_df.filter(pl.col('acc') == genome_acc).select('parsed_taxon_string').to_series().to_list()

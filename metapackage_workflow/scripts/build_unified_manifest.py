@@ -2,20 +2,16 @@
 """
 Build unified download manifest from NCBI, P10K, and JGI metadata.
 
-Consolidates metadata from three sources, queries NCBI for lineage info,
-filters out animals (Metazoa) and plants (Viridiplantae), and outputs a
+Consolidates metadata from three sources, resolves missing tax IDs, and outputs a
 single manifest for the unified download pipeline.
 
 Output columns: genome_acc, tax_id, download_source, group, original_name
 """
 import json
-import subprocess
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import polars as pl
-from Bio import Entrez
 import os
-import re
 
 from log_config import configure_logger
 from ncbi_taxid_resolver import resolve_accessions_to_taxids, lookup_taxid
@@ -147,192 +143,6 @@ def load_ncbi_metadata(metadata_file: str) -> pl.DataFrame:
     }).select([
         'genome_acc', 'tax_id', 'original_name', 'download_source', 'group'
     ]).unique()
-
-
-def query_ncbi_datasets_lineage(tax_ids: List[int]) -> Dict[int, str]:
-    """
-    Query NCBI Datasets CLI for lineage info and return dict of {taxid: lineage_string}.
-    Lineage format: d__domain;p__phylum;c__class;o__order;f__family;g__genus;s__species
-    """
-    lineage_map = {}
-    
-    if not tax_ids:
-        return lineage_map
-    
-    # Remove duplicates
-    tax_ids = list(set(tax_ids))
-    
-    try:
-        # Query NCBI Datasets for organism taxonomy info
-        # We'll use datasets summary taxonomy taxon command
-        tax_id_str = ','.join(str(tid) for tid in tax_ids)
-        
-        logger.info(f"Querying NCBI Datasets for {len(tax_ids)} tax IDs...")
-        
-        cmd = ['datasets', 'summary', 'taxonomy', 'taxon', tax_id_str, '--as-json-lines']
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        
-        for line in result.stdout.strip().split('\n'):
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-                tax_record = record.get('taxonomy', {})
-                tax_id = int(tax_record.get('tax_id', 0))
-                
-                if not tax_id:
-                    continue
-                
-                # Datasets emits rank names in taxonomy.classification.
-                classification = tax_record.get('classification', {})
-                lineage_parts = {}
-                
-                for rank, item in classification.items():
-                    rank = rank.lower()
-                    name = item.get('name', '')
-                    
-                    if rank in ['superkingdom', 'domain']:
-                        lineage_parts['domain'] = name
-                    elif rank == 'kingdom':
-                        lineage_parts['kingdom'] = name
-                    elif rank == 'phylum':
-                        lineage_parts['phylum'] = name
-                    elif rank == 'class':
-                        lineage_parts['class'] = name
-                    elif rank == 'order':
-                        lineage_parts['order'] = name
-                    elif rank == 'family':
-                        lineage_parts['family'] = name
-                    elif rank == 'genus':
-                        lineage_parts['genus'] = name
-                    elif rank == 'species':
-                        lineage_parts['species'] = name
-                
-                # Format as GTDB-like lineage
-                gtdb_lineage = ';'.join([
-                    f"d__{lineage_parts.get('domain', '')}",
-                    f"k__{lineage_parts.get('kingdom', '')}",
-                    f"p__{lineage_parts.get('phylum', '')}",
-                    f"c__{lineage_parts.get('class', '')}",
-                    f"o__{lineage_parts.get('order', '')}",
-                    f"f__{lineage_parts.get('family', '')}",
-                    f"g__{lineage_parts.get('genus', '')}",
-                    f"s__{lineage_parts.get('species', '')}"
-                ])
-                
-                lineage_map[tax_id] = gtdb_lineage
-            except (json.JSONDecodeError, ValueError, KeyError) as e:
-                logger.debug(f"Error parsing taxonomy record: {e}")
-                continue
-        
-        logger.info(f"Successfully queried lineage for {len(lineage_map)} tax IDs")
-    
-    except subprocess.CalledProcessError as e:
-        logger.error(f"NCBI Datasets query failed: {e.stderr}")
-        # Fallback: try Entrez API
-        logger.info("Falling back to NCBI Entrez API...")
-        lineage_map = query_ncbi_entrez_lineage(tax_ids, NCBI_EMAIL)
-    
-    return lineage_map
-
-
-def query_ncbi_entrez_lineage(tax_ids: List[int], email: str) -> Dict[int, str]:
-    """Fallback: Query NCBI Entrez API for lineage info."""
-    lineage_map = {}
-    
-    Entrez.email = email
-    
-    try:
-        # Batch query
-        tax_id_str = ','.join(str(tid) for tid in tax_ids)
-        handle = Entrez.efetch(db="Taxonomy", id=tax_id_str, retmode="xml")
-        records = Entrez.read(handle)
-        handle.close()
-        
-        for record in records:
-            tax_id = int(record.get('TaxId', 0))
-            if not tax_id:
-                continue
-            
-            lineage_parts = {}
-            lineage_ex = record.get('LineageEx', [])
-            
-            for item in lineage_ex:
-                rank = item.get('Rank', '').lower()
-                name = item.get('ScientificName', '')
-                
-                if rank in ['superkingdom', 'domain']:
-                    lineage_parts['domain'] = name
-                elif rank == 'phylum':
-                    lineage_parts['phylum'] = name
-                elif rank == 'class':
-                    lineage_parts['class'] = name
-                elif rank == 'order':
-                    lineage_parts['order'] = name
-                elif rank == 'family':
-                    lineage_parts['family'] = name
-                elif rank == 'genus':
-                    lineage_parts['genus'] = name
-            
-            species = record.get('ScientificName', '')
-            
-            gtdb_lineage = ';'.join([
-                f"d__{lineage_parts.get('domain', '')}",
-                f"p__{lineage_parts.get('phylum', '')}",
-                f"c__{lineage_parts.get('class', '')}",
-                f"o__{lineage_parts.get('order', '')}",
-                f"f__{lineage_parts.get('family', '')}",
-                f"g__{lineage_parts.get('genus', '')}",
-                f"s__{species}"
-            ])
-            
-            lineage_map[tax_id] = gtdb_lineage
-        
-        logger.info(f"Successfully queried Entrez lineage for {len(lineage_map)} tax IDs")
-    
-    except Exception as e:
-        logger.error(f"NCBI Entrez query failed: {e}")
-    
-    return lineage_map
-
-
-def filter_excluded_clades(manifest: pl.DataFrame, lineage_map: Dict[int, str]) -> pl.DataFrame:
-    """
-    Filter out records where lineage contains Metazoa (animals) or Viridiplantae (plants).
-    Also drops records with missing lineage info.
-    """
-    def is_excluded(tax_id):
-        lineage = lineage_map.get(tax_id, '')
-        if not lineage:
-            return True  # Exclude records without lineage info
-        
-        # Check for excluded clades
-        excluded_patterns = [
-            r'k__Metazoa',
-            r'k__Viridiplantae',
-            r'p__Chordata',
-            r'p__Streptophyta',
-        ]
-        
-        for pattern in excluded_patterns:
-            if re.search(pattern, lineage, re.IGNORECASE):
-                return True
-        
-        return False
-    
-    # Filter out excluded records
-    before_count = manifest.height
-    
-    manifest = manifest.with_columns(
-        pl.col('tax_id').map_elements(is_excluded, return_dtype=pl.Boolean).alias('_is_excluded')
-    ).filter(~pl.col('_is_excluded')).drop('_is_excluded')
-    
-    after_count = manifest.height
-    removed_count = before_count - after_count
-    
-    logger.info(f"Filtered manifest: {before_count} → {after_count} records ({removed_count} removed)")
-    
-    return manifest
 
 
 def resolve_p10k_tax_ids(manifest: pl.DataFrame) -> pl.DataFrame:

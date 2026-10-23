@@ -98,6 +98,11 @@ EXTERNAL_GENOME_MAP = load_external_genome_map(
 )
 
 OUTGROUP_ENABLED = bool(OUTGROUP_CONFIG.get("enabled", False))
+# Outgroup (Asgard) accessions to drop from the concatenated alignment when the outgroup is disabled,
+# since their sequences may still be present in previously aggregated/merged gene files.
+OUTGROUP_EXCLUDE = set()
+if not OUTGROUP_ENABLED and Path(OUTGROUP_CONFIG["genome_manifest"]).exists():
+    OUTGROUP_EXCLUDE = set(pl.read_csv(OUTGROUP_CONFIG["genome_manifest"])["acc"].cast(pl.Utf8).to_list())
 if OUTGROUP_ENABLED:
     OUTGROUP_MANIFEST = Path(OUTGROUP_CONFIG["genome_manifest"])
     OUTGROUP_GENOME_MAP = (
@@ -135,7 +140,7 @@ MERGED_BMGE_TARGETS   = build_merged_bmge_targets_factory(TREE_PATHS, MERGED_GEN
 MERGED_TAXONOMY_INPUT = build_merged_taxonomy_input_factory(EXTERNAL_PATHS, METAPACKAGE_TAXONOMY, USE_EXTERNAL)
 
 
-localrules: build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
+localrules: build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
 
 rule all:
     input:
@@ -229,7 +234,8 @@ rule external_busco_results_quality_control:
     output:
         manifest = EXTERNAL_PATHS["metadata"]["busco_qc"]
     params:
-        min_complete_markers = int(BUSCO_CONFIG["min_complete_markers"])
+        min_complete_markers = int(BUSCO_CONFIG["min_complete_markers"]),
+        use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False))
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
@@ -313,24 +319,47 @@ rule external_build_checkm2_quality_report:
 # if
 
 
-rule rebuild_taxonomy_mapping:
+rule build_external_taxid_manifest:
+    """(genome_acc, tax_id) for every genome with a known NCBI tax ID: metapackage genomes first, then external ones."""
     input:
-        base_taxonomy           = str(METAPACKAGE_TAXONOMY),
-        external_manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
-        external_taxid_map      = str(EXTERNAL_TAXID_MAP) if EXTERNAL_TAXID_MAP.exists() else [],
-        # eukcc_summary           = EXTERNAL_PATHS["metadata"]["eukcc_summary"]
+        base_taxonomy      = str(METAPACKAGE_TAXONOMY),
+        external_taxid_map = str(EXTERNAL_TAXID_MAP) if EXTERNAL_TAXID_MAP.exists() else []
+    output:
+        manifest = EXTERNAL_PATHS["metadata"]["taxid_manifest"]
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    log:
+        log_path("build_external_taxid_manifest")
+    run:
+        with redirect_to_log(log[0]):
+            sources = [pl.read_csv(input.base_taxonomy, separator="\t", infer_schema_length=0)]
+            if input.external_taxid_map:
+                sources.append(pl.read_csv(input.external_taxid_map, separator="\t", infer_schema_length=0))
+            manifest = (
+                pl.concat([df.select("acc", "ncbi_id") for df in sources])
+                .filter(pl.col("ncbi_id").is_not_null() & (pl.col("ncbi_id") != ""))
+                .unique(subset=["acc"], keep="first", maintain_order=True)
+                .rename({"acc": "genome_acc", "ncbi_id": "tax_id"})
+            )
+            Path(output.manifest).parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_csv(output.manifest, separator="\t")
+
+
+rule rebuild_taxonomy_mapping:
+    """Query NCBI for the manifest's tax IDs with the same script the metapackage workflow uses."""
+    input:
+        unified_manifest = EXTERNAL_PATHS["metadata"]["taxid_manifest"]
     output:
         taxonomy = EXTERNAL_PATHS["metadata"]["ncbi_rebuilt_taxonomy"]
     params:
-        email                  = NCBI_CONFIG["email"],
-        strict_requery         = bool(NCBI_CONFIG.get("strict_requery", False)),
-        external_taxid_map_path = str(EXTERNAL_TAXID_MAP)
+        email  = NCBI_CONFIG["email"],
+        strict = bool(NCBI_CONFIG.get("strict_requery", False))
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
         log_path("rebuild_taxonomy_mapping")
     script:
-        str(TREE_SCRIPTS / "rebuild_taxonomy_mapping.py")
+        str(METAPACKAGE_SCRIPTS / "fetch_ncbi_taxonomy.py")
 
 
 checkpoint aggregate_external_busco_sequences:
@@ -344,7 +373,8 @@ checkpoint aggregate_external_busco_sequences:
         genome_input_genomes = EXTERNAL_PATHS["aggregate"]["genome_protein_files"],
         genome_input_hmms    = EXTERNAL_PATHS["aggregate"]["hmms_and_names"]
     params:
-        min_sequences_per_gene = int(AGGREGATION_CONFIG.get("min_sequences_per_gene", 1))
+        min_sequences_per_gene = int(AGGREGATION_CONFIG.get("min_sequences_per_gene", 1)),
+        allow_missing_taxonomy = bool(AGGREGATION_CONFIG.get("allow_missing_taxonomy", True))
     threads: 8
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
@@ -486,6 +516,9 @@ rule generate_alignment:
                 )
             )
 
+            if OUTGROUP_EXCLUDE:
+                species_df = species_df.filter(~pl.col("species_acc").is_in(list(OUTGROUP_EXCLUDE)))
+
             final_seq_list = [
                 SeqRecord(seq=Seq(species["full_gene_sequence"]), id=str(species["species_acc"]), description="")
                 for species in species_df.iter_rows(named=True)
@@ -583,6 +616,7 @@ else:
 
 
 rule prepare_taxonomy:
+    """Split the taxonomy mapping into the files phylorank/assign_taxonomy read (no parsing: tax_status decides)."""
     input:
         taxonomy_mapping = MERGED_TAXONOMY_INPUT
     output:
@@ -593,10 +627,34 @@ rule prepare_taxonomy:
     resources: **DEFAULT_RESOURCES
     log:
         log_path("prepare_taxonomy")
-    conda:
-        env("taxonomy")
-    script:
-        str(TREE_SCRIPTS / "prepare_taxonomy.py")
+    run:
+        with redirect_to_log(log[0]):
+            mapping = pl.read_csv(input.taxonomy_mapping, separator="\t", infer_schema_length=0)
+            missing = {"acc", "parsed_taxon_string", "tax_status"} - set(mapping.columns)
+            if missing:
+                raise ValueError(
+                    f"{input.taxonomy_mapping} lacks columns {sorted(missing)}; rerun the taxonomy query rule"
+                )
+            mapping = mapping.unique(subset=["acc"], keep="first", maintain_order=True)
+
+            def select_status(statuses):
+                return (
+                    mapping.filter(pl.col("tax_status").is_in(statuses))
+                    .select(pl.col("acc").alias("genome_id"), pl.col("parsed_taxon_string").alias("taxonomy"))
+                )
+
+            complete = select_status(["complete"])            # all seven ranks: reference + trusted taxa
+            usable = select_status(["complete", "partial"])   # anything with a rank below domain
+
+            for path in (output.taxonomy, output.conservative_taxonomy, output.trusted_taxa):
+                Path(path).parent.mkdir(parents=True, exist_ok=True)
+            complete.write_csv(output.taxonomy, separator="\t", include_header=False)
+            usable.write_csv(output.conservative_taxonomy, separator="\t", include_header=False)
+
+            trusted = list(dict.fromkeys(
+                taxon.strip() for lineage in complete["taxonomy"] for taxon in lineage.split(";")
+            ))
+            Path(output.trusted_taxa).write_text("\n".join(trusted) + ("\n" if trusted else ""), encoding="utf-8")
 
 
 rule phylorank_decorate:

@@ -315,32 +315,52 @@ def deduplicate_sequences(genome_sequences: Dict) -> Tuple[Dict, int]:
     return deduplicated, duplicates_removed
 
 
-def resolve_sequence_taxonomy(seq_id: str, info: Dict, taxonomy_df: pl.DataFrame) -> Optional[str]:
-    """Return a GTDB-style taxonomy string for a sequence, or None if unresolved."""
-    original_genome_acc = info.get('original_genome_acc', seq_id)
-    tax_row = taxonomy_df.filter(pl.col('acc') == str(original_genome_acc))
-    if len(tax_row) == 0:
-        return None
-    taxonomy = tax_row['parsed_taxon_string'][0]
-    if not taxonomy or ';' not in taxonomy:
-        return None
-    return taxonomy
+USABLE_TAX_STATUSES = ('complete', 'partial')
 
 
-def filter_resolved_sequences(deduplicated_sequences: Dict, taxonomy_df: pl.DataFrame,
-                              busco_id: str) -> Dict:
+def load_usable_taxonomy(taxonomy_df: pl.DataFrame) -> Dict[str, str]:
+    """Return {genome acc: taxonomy string} for genomes with a usable taxonomy.
+
+    "Usable" is defined once, by ``tax_status`` in the mapping written by
+    fetch_ncbi_taxonomy.py; genomes absent from the mapping have no taxonomy.
+    """
+    required = {'acc', 'parsed_taxon_string', 'tax_status'}
+    missing = required - set(taxonomy_df.columns)
+    if missing:
+        raise ValueError(
+            f"Taxonomy mapping is missing columns {sorted(missing)}; "
+            "regenerate it with the fetch_ncbi_taxonomy rule"
+        )
+    usable = taxonomy_df.filter(pl.col('tax_status').is_in(USABLE_TAX_STATUSES))
+    return dict(zip(usable['acc'].cast(pl.Utf8).to_list(), usable['parsed_taxon_string'].to_list()))
+
+
+def resolve_sequence_taxonomy(seq_id: str, info: Dict, usable_taxonomy: Dict[str, str]) -> Optional[str]:
+    """Return the taxonomy string for a sequence's genome, or None if it has no usable taxonomy."""
+    return usable_taxonomy.get(str(info.get('original_genome_acc', seq_id)))
+
+
+def filter_resolved_sequences(deduplicated_sequences: Dict, usable_taxonomy: Dict[str, str],
+                              busco_id: str, allow_missing_taxonomy: bool = False) -> Dict:
     """
     Keep only sequences whose genome has a usable taxonomy entry.
 
     FASTA and taxonomy outputs must contain the same sequence set, otherwise
     downstream tools like graftM create fail with 'Unable to find sequence in
     the taxonomy definition'.
+
+    If allow_missing_taxonomy is True (e.g. tree building, which does not need
+    per-sequence taxonomy), all sequences are kept. The per-gene taxonomy TSV
+    will then only list sequences that do have a usable taxonomy.
     """
+    if allow_missing_taxonomy:
+        return dict(deduplicated_sequences)
+
     kept = {}
     skipped = 0
 
     for seq_id, info in deduplicated_sequences.items():
-        if resolve_sequence_taxonomy(seq_id, info, taxonomy_df) is None:
+        if resolve_sequence_taxonomy(seq_id, info, usable_taxonomy) is None:
             skipped += 1
             continue
         kept[seq_id] = info
@@ -386,14 +406,14 @@ def write_gene_fasta(busco_id: str, deduplicated_sequences: Dict, output_dir: Pa
 
 
 def write_taxonomy_file(busco_id: str, deduplicated_sequences: Dict, 
-                       taxonomy_df: pl.DataFrame, output_dir: Path) -> Path:
+                       usable_taxonomy: Dict[str, str], output_dir: Path) -> Path:
     """
     Write taxonomy mapping file for pre-deduplicated sequences.
     
     Args:
         busco_id: BUSCO gene identifier
         deduplicated_sequences: Pre-deduplicated sequences keyed by sequence_id
-        taxonomy_df: DataFrame with taxonomy information
+        usable_taxonomy: {genome acc: taxonomy string} for genomes with a usable taxonomy
         output_dir: Output directory path
         
     Returns:
@@ -407,7 +427,7 @@ def write_taxonomy_file(busco_id: str, deduplicated_sequences: Dict,
         f.write("sequence_id\ttaxonomy\n")
 
         for seq_id, info in deduplicated_sequences.items():
-            taxonomy = resolve_sequence_taxonomy(seq_id, info, taxonomy_df)
+            taxonomy = resolve_sequence_taxonomy(seq_id, info, usable_taxonomy)
             if taxonomy is None:
                 skipped += 1
                 logger.debug(f"Skipping {seq_id}: no usable taxonomy")
@@ -425,9 +445,10 @@ def write_taxonomy_file(busco_id: str, deduplicated_sequences: Dict,
 
 def reorganize_for_singlem_genome_input(
     gene_sequences: Dict[str, Dict],
-    taxonomy_df: pl.DataFrame,
+    usable_taxonomy: Dict[str, str],
     output_dir: Path,
     min_sequences_per_gene: int,
+    allow_missing_taxonomy: bool = False,
 ) -> Tuple[List[str], Path, Path]:
     """
     Reorganize BUSCO data for the singlem genome input workflow:
@@ -437,8 +458,12 @@ def reorganize_for_singlem_genome_input(
     
     Args:
         gene_sequences: Dictionary mapping busco_id to taxon sequences
-        taxonomy_df: DataFrame with taxonomy information
+        usable_taxonomy: {genome acc: taxonomy string} for genomes with a usable taxonomy
         output_dir: Output directory path
+        min_sequences_per_gene: Minimum number of sequences required per genome
+        allow_missing_taxonomy: Keep genomes without a usable taxonomy in the
+            genome FASTAs and genome list (they are still omitted from
+            genome_taxonomy.tsv)
         
     Returns:
         Tuple of (processed_genomes, genome_file_list_path, hmms_and_names_path)
@@ -459,16 +484,9 @@ def reorganize_for_singlem_genome_input(
     
     logger.info(f"Found {len(genome_sequences)} genomes with BUSCO sequences")
 
-    # Genomes without a usable taxonomy cannot be used downstream; exclude them
-    # from the genome FASTAs, genome list, and genome taxonomy file alike.
-    resolved_accs = set(
-        taxonomy_df
-        .filter(
-            pl.col('parsed_taxon_string').is_not_null()
-            & (pl.col('parsed_taxon_string') != '')
-        )['acc']
-        .to_list()
-    )
+    # Genomes without a usable taxonomy are excluded from the genome FASTAs, genome list,
+    # and genome taxonomy file alike, unless allow_missing_taxonomy is set.
+    resolved_accs = set(usable_taxonomy)
 
     # Write genome-centric FASTA files
     processed_genomes = []
@@ -476,7 +494,7 @@ def reorganize_for_singlem_genome_input(
     skipped_no_taxonomy = 0
 
     for genome_id, busco_seqs in genome_sequences.items():
-        if genome_id not in resolved_accs:
+        if not allow_missing_taxonomy and genome_id not in resolved_accs:
             skipped_no_taxonomy += 1
             continue
         if len(busco_seqs) >= min_sequences_per_gene:
@@ -526,48 +544,38 @@ def reorganize_for_singlem_genome_input(
             if hmm_file.exists():
                 f.write(f"{busco_id}\t{busco_id}\t{hmm_file.absolute()}\t{busco_id}\n")
     
-    # Create taxonomy file for genomes
+    # Create taxonomy file for genomes (only genomes with a usable taxonomy are listed)
     genome_taxonomy_file = output_dir / "genome_taxonomy.tsv"
     kept_genomes = 0
-    skipped_genomes = 0
     with open(genome_taxonomy_file, 'w') as f:
         f.write("genome_id\ttaxonomy\n")
-        
         for genome_id in processed_genomes:
-            # Look up taxonomy for the genome
-            tax_row = taxonomy_df.filter(pl.col('acc') == str(genome_id))
-            
-            if len(tax_row) > 0:
-                taxonomy = tax_row['parsed_taxon_string'][0]
-                if not taxonomy or ';' not in taxonomy:
-                    skipped_genomes += 1
-                    logger.debug(f"Skipping genome taxonomy for {genome_id}: shallow taxonomy ({taxonomy})")
-                    continue
-            else:
-                skipped_genomes += 1
-                logger.debug(f"Skipping genome taxonomy for {genome_id}: no taxonomy found")
+            taxonomy = usable_taxonomy.get(str(genome_id))
+            if taxonomy is None:
                 continue
-            
             f.write(f"{genome_id}\t{taxonomy}\n")
             kept_genomes += 1
 
+    skipped_genomes = len(processed_genomes) - kept_genomes
     if skipped_genomes > 0:
-        logger.info(f"genome_taxonomy.tsv: wrote {kept_genomes} genomes and skipped {skipped_genomes} unresolved/shallow rows")
-    
+        logger.info(f"genome_taxonomy.tsv: wrote {kept_genomes} genomes and skipped {skipped_genomes} without usable taxonomy")
+
     logger.info(f"SingleM genome-input reorganization complete: {len(processed_genomes)} genomes processed")
     return processed_genomes, genome_list_file, hmms_and_names_file
 
 
-def write_gene_files(gene_sequences: Dict[str, Dict], taxonomy_df: pl.DataFrame, 
-                    output_dir: Path, min_sequences: int = 5) -> List[str]:
+def write_gene_files(gene_sequences: Dict[str, Dict], usable_taxonomy: Dict[str, str], 
+                    output_dir: Path, min_sequences: int = 5,
+                    allow_missing_taxonomy: bool = False) -> List[str]:
     """
     Write FASTA and taxonomy files for genes with sufficient sequences.
     
     Args:
         gene_sequences: Dictionary mapping busco_id to taxon sequences
-        taxonomy_df: DataFrame with taxonomy information
+        usable_taxonomy: {genome acc: taxonomy string} for genomes with a usable taxonomy
         output_dir: Output directory path
         min_sequences: Minimum number of sequences required per gene
+        allow_missing_taxonomy: Keep sequences whose genome has no usable taxonomy
         
     Returns:
         List of processed gene IDs
@@ -589,7 +597,7 @@ def write_gene_files(gene_sequences: Dict[str, Dict], taxonomy_df: pl.DataFrame,
                 # Keep only sequences with a usable taxonomy so the FASTA and
                 # taxonomy TSV always describe the same sequence set.
                 deduplicated_seqs = filter_resolved_sequences(
-                    deduplicated_seqs, taxonomy_df, busco_id
+                    deduplicated_seqs, usable_taxonomy, busco_id, allow_missing_taxonomy
                 )
                 if not deduplicated_seqs:
                     logger.warning(f"Skipping {busco_id}: no sequences with resolved taxonomy")
@@ -599,7 +607,7 @@ def write_gene_files(gene_sequences: Dict[str, Dict], taxonomy_df: pl.DataFrame,
                 fasta_file = write_gene_fasta(busco_id, deduplicated_seqs, output_dir)
                 
                 # Write taxonomy file with same deduplicated sequences
-                tax_file = write_taxonomy_file(busco_id, deduplicated_seqs, taxonomy_df, output_dir)
+                tax_file = write_taxonomy_file(busco_id, deduplicated_seqs, usable_taxonomy, output_dir)
                 
                 processed_genes.append(busco_id)
                 logger.debug(f"Wrote files for {busco_id} ({len(deduplicated_seqs)} unique sequences)")
@@ -625,6 +633,9 @@ def main():
     output_dir = Path(snakemake.output.sequences_dir)
     taxonomy_file = snakemake.input.taxonomy
     use_multi_copy = snakemake.params.get('use_multi_copy', False)
+    allow_missing_taxonomy = bool(snakemake.params.get('allow_missing_taxonomy', False))
+    if allow_missing_taxonomy:
+        logger.info("allow_missing_taxonomy enabled: keeping sequences/genomes without taxonomy")
 
     if not manifest_file.exists():
         raise FileNotFoundError(f"BUSCO manifest file not found: {manifest_file}")
@@ -648,7 +659,9 @@ def main():
     # Load taxonomy mapping
     logger.info(f"Loading taxonomy mapping from {taxonomy_file}")
     taxonomy_df = pl.read_csv(taxonomy_file, separator='\t')
-    logger.info(f"Loaded taxonomy mapping with {len(taxonomy_df)} entries")
+    usable_taxonomy = load_usable_taxonomy(taxonomy_df)
+    logger.info(f"Loaded taxonomy mapping with {len(taxonomy_df)} entries "
+                f"({len(usable_taxonomy)} with usable taxonomy)")
     
     # Process all BUSCO results - let errors bubble up
     gene_sequences = process_all_busco_results(busco_results, use_multi_copy)
@@ -658,13 +671,17 @@ def main():
         raise RuntimeError("No gene sequences were successfully processed from any BUSCO files")
     
     # Write traditional gene-centric files (for backward compatibility)
-    processed_genes = write_gene_files(gene_sequences, taxonomy_df, output_dir)
+    processed_genes = write_gene_files(
+        gene_sequences, usable_taxonomy, output_dir,
+        allow_missing_taxonomy=allow_missing_taxonomy,
+    )
     
     # Reorganize for singlem genome-input workflow format
     min_sequences_per_gene = snakemake.params.get('min_sequences_per_gene', 5)
     genome_input_dir = Path(snakemake.output.genome_input_genomes).parent
     processed_genomes, genome_list_file, hmms_file = reorganize_for_singlem_genome_input(
-        gene_sequences, taxonomy_df, genome_input_dir, min_sequences_per_gene
+        gene_sequences, usable_taxonomy, genome_input_dir, min_sequences_per_gene,
+        allow_missing_taxonomy=allow_missing_taxonomy,
     )
     
     logger.info(f"Successfully completed aggregation: "
