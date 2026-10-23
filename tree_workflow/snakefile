@@ -376,7 +376,9 @@ checkpoint aggregate_external_busco_sequences:
         genome_input_hmms    = EXTERNAL_PATHS["aggregate"]["hmms_and_names"]
     params:
         min_sequences_per_gene = int(AGGREGATION_CONFIG.get("min_sequences_per_gene", 1)),
-        allow_missing_taxonomy = bool(AGGREGATION_CONFIG.get("allow_missing_taxonomy", True))
+        allow_missing_taxonomy = bool(AGGREGATION_CONFIG.get("allow_missing_taxonomy", True)),
+        # same switch as the QC rule above, so the marker count and the aggregated genes agree
+        use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False))
     threads: 8
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
@@ -453,80 +455,15 @@ rule generate_alignment:
         alignment_files = MERGED_BMGE_TARGETS
     output:
         concatinated_alignment = TREE_PATHS["alignment"]
+    params:
+        exclude = sorted(OUTGROUP_EXCLUDE),
+        min_genes_per_genome = int(ALIGNMENT_CONFIG.get("min_genes_per_genome", 1))
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
         log_path("generate_alignment")
-    run:
-        with redirect_to_log(log[0]):
-            from Bio import SeqIO
-            from Bio.Seq import Seq
-            from Bio.SeqRecord import SeqRecord
-
-            alignment_files = input.alignment_files
-            if isinstance(alignment_files, (str, Path)):
-                alignment_files = [Path(alignment_files)]
-            else:
-                alignment_files = [Path(path) for path in alignment_files]
-
-            valid_alignment_files = [path for path in alignment_files if path.is_file()]
-            invalid_alignment_files = [path for path in alignment_files if not path.is_file()]
-            if invalid_alignment_files:
-                invalid_text = ", ".join(str(path) for path in invalid_alignment_files)
-                if not valid_alignment_files:
-                    raise FileNotFoundError(f"No valid BMGE alignment files were found. Invalid inputs: {invalid_text}")
-                print(f"Skipping invalid BMGE alignment inputs: {invalid_text}")
-
-            species_df = pl.DataFrame(schema={"species_acc": str})
-            gene_length = {}
-
-            for alignment_file in valid_alignment_files:
-                gene_name = alignment_file.name.split("_bmge")[0]
-                species_gene_dict = {}
-                for record in SeqIO.parse(str(alignment_file), "fasta"):
-                    species = record.id.split("|")[0]
-                    species_gene_dict.setdefault(species, str(record.seq))
-
-                if not species_gene_dict:
-                    continue
-
-                gene_index = f"gene_sequence-{gene_name}"
-                gene_length[gene_index] = len(next(iter(species_gene_dict.values())))
-                gene_df = (
-                    pl.DataFrame(
-                        {
-                            "species_acc": list(species_gene_dict.keys()),
-                            gene_index: list(species_gene_dict.values()),
-                        }
-                    )
-                    .join(species_df.select("species_acc"), on="species_acc", how="full", coalesce=True)
-                )
-
-                species_df = species_df.join(gene_df, on="species_acc", how="full", coalesce=True)
-
-            species_df = (
-                species_df.with_columns(
-                    [
-                        pl.col(col).fill_null("-" * gene_length.get(col, 0))
-                        for col in species_df.columns
-                        if col.startswith("gene_sequence-")
-                    ]
-                )
-                .select(
-                    pl.col("species_acc"),
-                    pl.concat_str([pl.col("^gene_sequence-\\w+$")]).alias("full_gene_sequence"),
-                )
-            )
-
-            if OUTGROUP_EXCLUDE:
-                species_df = species_df.filter(~pl.col("species_acc").is_in(list(OUTGROUP_EXCLUDE)))
-
-            final_seq_list = [
-                SeqRecord(seq=Seq(species["full_gene_sequence"]), id=str(species["species_acc"]), description="")
-                for species in species_df.iter_rows(named=True)
-            ]
-
-            SeqIO.write(final_seq_list, output.concatinated_alignment, "fasta")
+    script:
+        str(TREE_SCRIPTS / "generate_alignment.py")
 
 
 rule build_tree:

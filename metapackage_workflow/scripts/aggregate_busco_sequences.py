@@ -52,16 +52,23 @@ def parse_busco_file(busco_file: Path, use_multi_copy: bool) -> Tuple[str, str, 
     if 'Score' not in busco_df.columns:
         raise ValueError(f"Missing 'Score' column in {busco_file}. Found columns: {busco_df.columns}")
 
-    # Keep every complete or duplicated hit, with copy 1 being the best-scoring hit.
+    # One sequence per BUSCO gene: its top-scoring hit. Complete genes have a single hit.
+    # With use_multi_copy, Duplicated genes are included too and are represented by their
+    # best-scoring copy (not by every copy), so a multicopy gene still adds phylogenetic
+    # information without putting paralogs side by side in the alignment. Ties are broken
+    # deterministically (longer protein, then position) so reruns select the same copy.
+    sort_columns = ['Busco id', 'Score'] + (['Length'] if 'Length' in busco_df.columns else []) + ['Sequence', 'Gene Start']
     selected_genes = (
         busco_df
         .filter(pl.col('Status').is_in(['Complete'] + (['Duplicated'] if use_multi_copy else [])))
         .with_columns(pl.col('Score').cast(pl.Float64, strict=False))
-        .sort(['Busco id', 'Score'], descending=[False, True], nulls_last=True)
-        .unique(subset=['Busco id'], keep='first')
+        .sort(sort_columns,
+              descending=[False, True] + ([True] if 'Length' in busco_df.columns else []) + [False, False],
+              nulls_last=True)
+        .unique(subset=['Busco id'], keep='first', maintain_order=True)
     )
-    
-    logger.info(f"Found {len(selected_genes)} complete/duplicated genes for {group}/{genome_acc}")
+
+    logger.info(f"Selected {len(selected_genes)} BUSCO genes (top hit each) for {group}/{genome_acc}")
     return group, genome_acc, selected_genes
 
 
@@ -653,8 +660,14 @@ def main():
     if not Path(taxonomy_file).exists():
         raise FileNotFoundError(f"Taxonomy file not found: {taxonomy_file}")
     
-    # Create output directory
+    # Create output directory. Files of genes/genomes from earlier runs would otherwise stay
+    # behind and be picked up by later steps, so start from an empty set of aggregated files.
     output_dir.mkdir(parents=True, exist_ok=True)
+    for stale in list(output_dir.glob("*.faa")) + list(output_dir.glob("*_taxonomy.tsv")):
+        stale.unlink()
+    genome_input_dir_early = Path(snakemake.output.genome_input_genomes).parent
+    for stale in (genome_input_dir_early / "genomes").glob("*.faa"):
+        stale.unlink()
     
     # Load taxonomy mapping
     logger.info(f"Loading taxonomy mapping from {taxonomy_file}")

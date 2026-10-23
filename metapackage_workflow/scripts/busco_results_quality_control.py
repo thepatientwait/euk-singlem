@@ -20,17 +20,22 @@ def _extract_group_and_genome_acc(path: Path) -> Tuple[str, str]:
 
 
 def _count_complete_markers(busco_result: Path, use_multi_copy: bool) -> Optional[int]:
+    """Number of distinct BUSCO genes with a usable hit.
+
+    Counts genes, not table rows: a Duplicated gene has several rows but contributes one
+    sequence to the aggregation (its top hit), so it counts once.
+    """
     try:
-        complete_count = 0
+        statuses = {"Complete"} | ({"Duplicated"} if use_multi_copy else set())
+        genes = set()
         with open(busco_result, "r", encoding="utf-8") as handle:
             for line in handle:
                 if not line or line.startswith("#"):
                     continue
                 parts = line.rstrip("\n").split("\t")
-                if len(parts) > 1 and (parts[1] == "Complete" or parts[1] == "Duplicated"):
-                    if use_multi_copy or parts[1] == "Complete":
-                        complete_count += 1
-        return complete_count
+                if len(parts) > 1 and parts[1] in statuses:
+                    genes.add(parts[0])
+        return len(genes)
     except Exception as error:
         logger.warning("Could not parse BUSCO result %s: %s", busco_result, error)
         return None

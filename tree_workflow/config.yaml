@@ -20,6 +20,10 @@ busco:
   lineage: "eukaryota_odb12"
   mode: "genome"
   min_complete_markers: 20
+  # Include Duplicated BUSCO genes, each represented by its top-scoring copy (one sequence per
+  # gene per genome). Keep equal to busco.quality_control.use_multi_copy of the metapackage
+  # workflow, which produces the base genomes' sequences.
+  use_multi_copy: true
 
 aggregation:
   min_sequences_per_gene: 20
@@ -41,6 +45,7 @@ alignment:
   bmge_h: 0.6
   bmge_g: 0.6
   bmge_matrix: "BLOSUM62"
+  min_genes_per_genome: 20   # genomes with fewer genes in the supermatrix are left out of the tree
 
 taxonomy:
   phylorank_command: "phylorank"

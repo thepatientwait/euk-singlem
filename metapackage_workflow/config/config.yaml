@@ -38,7 +38,9 @@ busco:
   mode: genome
   quality_control:
     min_complete_markers: 40
-  use_multi_copy: false
+    # Include Duplicated BUSCO genes, represented by their top-scoring copy (one sequence per
+    # gene per genome). Must be set here: the workflow reads busco.quality_control.use_multi_copy.
+    use_multi_copy: true
 
 # NCBI Entrez configuration
 ncbi:
