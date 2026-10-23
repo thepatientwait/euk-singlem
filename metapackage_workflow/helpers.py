@@ -344,6 +344,31 @@ def needs_download(path: str, retry_failed: bool = False) -> bool:
     return retry_failed and p.stat().st_size == 0
 
 
+_JGI_STATUS_CACHE = {}
+
+
+def get_jgi_file_status(group: str, genome_acc: str) -> Optional[str]:
+    """Status of the genome's file (the largest, as the download uses) in the group JSON."""
+    path = Path(f"outputs/metadata/source/jgi/{group}.json")
+    stamp = (str(path), path.stat().st_mtime if path.exists() else None)
+    if stamp not in _JGI_STATUS_CACHE:
+        statuses = {}
+        if path.exists():
+            with open(path, "r", encoding="utf-8") as handle:
+                for org in json.load(handle)["organisms"]:
+                    files = org.get("files") or []
+                    if files:
+                        biggest = max(files, key=lambda f: int(f.get("file_size") or 0))
+                        statuses[org.get("portal_detail_id")] = biggest.get("file_status")
+        _JGI_STATUS_CACHE[stamp] = statuses
+    return _JGI_STATUS_CACHE[stamp].get(genome_acc)
+
+
+def jgi_is_waiting(group: str, genome_acc: str) -> bool:
+    """True if the genome's file is not downloadable yet (the job will have to wait for a restore)."""
+    return get_jgi_file_status(group, genome_acc) not in DOWNLOADABLE_STATUSES
+
+
 def get_jgi_not_ready_paths(groups: List[str]) -> dict:
     """Genome path -> JGI file status for files that cannot be downloaded yet.
 
@@ -373,14 +398,15 @@ def build_all_genomes_to_download(
     p10k_checkpoint_getter: Callable,
     ncbi_checkpoint_getter: Callable,
     retry_failed: bool = False,
-    skip_jgi_unrestored: bool = True,
+    skip_jgi_unrestored: bool = False,
 ) -> Callable:
     """Input function returning only genomes that still need a download job.
 
     Genomes already on disk get no job at all (so no queue time and no rerun-trigger
     re-downloads). The checkpoint getters are still called so the DAG waits for metadata.
-    JGI genomes whose file is not yet downloadable (tape / restore pending) are left out until a
-    metadata refresh shows them as restored.
+    By default genomes whose JGI file is not yet downloadable (tape / restore pending) get a job
+    too: it waits for the restore (see download_jgi_genome.py). With ``skip_jgi_unrestored`` they
+    are left out instead, until a metadata refresh shows them as restored.
     """
     def _get_all_genomes_to_download(wildcards):
         expected = get_expected_genome_paths(

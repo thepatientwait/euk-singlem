@@ -76,7 +76,7 @@ class TestFetchAllPages(unittest.TestCase):
                 jgi_common.fetch_all_pages("http://x?a=1", FakeLogger())
 
 
-class TestRefresh(unittest.TestCase):
+class TestWriteIfChanged(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.path = Path(self.tmp.name) / "fungi.json"
@@ -87,34 +87,116 @@ class TestRefresh(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def refresh(self, new=None, error=None):
-        with mock.patch.object(rjm, "fetch_all_pages", side_effect=error, return_value=new):
-            return rjm.refresh_group("fungi", "http://x", self.path, FakeLogger())
+    def write(self, new):
+        return rjm.write_json_if_changed(self.path, new, FakeLogger(), label="fungi")
 
     def test_unchanged_keeps_mtime(self):
-        self.assertFalse(self.refresh({"organisms": list(self.old["organisms"]), "next_page": False}))
+        self.assertFalse(self.write({"organisms": list(self.old["organisms"]), "next_page": False}))
         self.assertEqual(self.path.stat().st_mtime, 1000)
 
     def test_changed_status_replaces(self):
         new = {"organisms": [org("a", "RESTORE_REGISTERED"), org("b", "RESTORED")]}
-        self.assertTrue(self.refresh(new))
-        saved = json.loads(self.path.read_text())["organisms"]
-        self.assertEqual(saved[1]["files"][0]["file_status"], "RESTORED")
+        self.assertTrue(self.write(new))
+        self.assertEqual(json.loads(self.path.read_text())["organisms"][1]["files"][0]["file_status"], "RESTORED")
         self.assertGreater(self.path.stat().st_mtime, 1000)
         self.assertFalse(list(Path(self.tmp.name).glob("*.tmp")))
 
-    def test_failure_keeps_existing(self):
-        self.assertFalse(self.refresh(error=RuntimeError("HTTP 500")))
-        self.assertEqual(json.loads(self.path.read_text()), self.old)
-
     def test_truncated_answer_refused(self):
-        self.assertFalse(self.refresh({"organisms": [org("a", "RESTORED")]}))
+        with self.assertRaisesRegex(RuntimeError, "refusing"):
+            self.write({"organisms": [org("a", "RESTORED")]})
         self.assertEqual(json.loads(self.path.read_text()), self.old)
 
-    def test_missing_file_is_left_to_the_checkpoint(self):
+    def test_missing_file_is_created(self):
         self.path.unlink()
-        self.assertFalse(self.refresh({"organisms": []}))
-        self.assertFalse(self.path.exists())
+        self.assertTrue(self.write({"organisms": [org("a", "RESTORED")]}))
+        self.assertTrue(self.path.exists())
+
+    def test_bytes(self):
+        csv = Path(self.tmp.name) / "m.csv"
+        self.assertTrue(rjm.write_bytes_if_changed(csv, b"x"))
+        os.utime(csv, (1000, 1000))
+        self.assertFalse(rjm.write_bytes_if_changed(csv, b"x"))
+        self.assertEqual(csv.stat().st_mtime, 1000)
+        self.assertTrue(rjm.write_bytes_if_changed(csv, b"y"))
+
+
+class TestWaitForRestore(unittest.TestCase):
+    """download_jgi_genome.main polls until the file is restored, then downloads."""
+
+    def run_main(self, statuses, wait=True, report=None, request_restore=False):
+        import download_jgi_genome as dj
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        out = Path(tmp.name) / "g.fasta.gz"
+        sleeps, posts = [], []
+        queue = list(statuses)
+
+        def fake_query(acc, name, anonymous, authed):
+            status = queue.pop(0) if len(queue) > 1 else queue[0]
+            return {"_id": "o"}, {"_id": "f", "file_status": status, "file_name": name}
+
+        class Download:
+            status_code = 200
+            def __enter__(self_inner):
+                return self_inner
+            def __exit__(self_inner, *a):
+                return False
+            def iter_content(self_inner, chunk_size):
+                import zipfile
+                buf = io.BytesIO()
+                with zipfile.ZipFile(buf, "w") as zf:
+                    zf.writestr("g.fa.gz", gzip.compress(b">s\nACGT\n"))
+                yield buf.getvalue()
+
+        def fake_request(session, method, url, logger, **kwargs):
+            posts.append(url)
+            return Download() if url == dj.JDP_DOWNLOAD_URL else types.SimpleNamespace(status_code=200, text="{}")
+
+        secrets = Path(tmp.name) / "secrets.yaml"
+        secrets.write_text("jgi_token: tok\n")
+        builtins.snakemake = types.SimpleNamespace(
+            wildcards=types.SimpleNamespace(genome_acc="g"),
+            output=types.SimpleNamespace(genome=str(out)),
+            input=types.SimpleNamespace(get=lambda key, default=None: report),
+            params=types.SimpleNamespace(name="g.fa.gz", token="t", secrets=str(secrets), wait=wait,
+                                         poll_seconds=900, request_restore=request_restore))
+        with mock.patch.object(dj, "query_file", fake_query), \
+                mock.patch.object(dj, "request_with_retries", fake_request), \
+                mock.patch.object(dj, "check_token", lambda *a, **k: 1e6), \
+                mock.patch.object(dj.time, "sleep", sleeps.append):
+            dj.main()
+        return out, sleeps, posts
+
+    def test_polls_until_restored_then_downloads(self):
+        out, sleeps, posts = self.run_main(["PURGED", "RESTORE_REGISTERED", "RESTORE_REGISTERED", "RESTORED"])
+        self.assertEqual(len(sleeps), 3)
+        self.assertTrue(all(810 <= x <= 990 for x in sleeps))  # 15 min +-10 %
+        self.assertTrue(out.exists() and out.stat().st_size > 0)
+        self.assertEqual(posts, [__import__("download_jgi_genome").JDP_DOWNLOAD_URL])
+
+    def test_ready_file_does_not_wait(self):
+        out, sleeps, _ = self.run_main(["RESTORED"])
+        self.assertEqual(sleeps, [])
+        self.assertTrue(out.exists())
+
+    def test_without_wait_fails_at_once(self):
+        import jgi_common
+        with self.assertRaises(jgi_common.JgiNotRestoredError):
+            self.run_main(["RESTORE_REGISTERED"], wait=False)
+
+    def test_refused_restore_fails_at_once(self):
+        import jgi_common
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        report = Path(tmp.name) / "nr.tsv"
+        report.write_text("genome_acc\tfile_status\tstate\ng\tPURGED\trestore_refused\n")
+        with self.assertRaisesRegex(jgi_common.JgiNotRestoredError, "refused"):
+            self.run_main(["PURGED"], report=str(report))
+
+    def test_requests_restore_itself_when_asked(self):
+        out, sleeps, posts = self.run_main(["PURGED", "RESTORED"], request_restore=True)
+        dj = __import__("download_jgi_genome")
+        self.assertEqual(posts, [dj.JDP_RESTORE_URL, dj.JDP_DOWNLOAD_URL])
 
 
 class TestWhitelist(unittest.TestCase):
@@ -136,8 +218,39 @@ class TestWhitelist(unittest.TestCase):
 
                 with mock.patch.object(helpers, "get_expected_genome_paths", return_value=[
                         f"outputs/genomes/fungi/{a}.fasta.gz" for a in ["tape", "pending", "ready", "bk", "have"]]):
-                    todo = helpers.build_all_genomes_to_download(["fungi"], None, None, None)(None)
+                    todo = helpers.build_all_genomes_to_download(["fungi"], None, None, None, skip_jgi_unrestored=True)(None)
                     self.assertEqual([Path(p).name for p in todo], ["ready.fasta.gz", "bk.fasta.gz"])
+            finally:
+                os.chdir(old_cwd)
+
+
+class TestWaitingStatus(unittest.TestCase):
+    def test_status_lookup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                Path("outputs/metadata/source/jgi").mkdir(parents=True)
+                Path("outputs/metadata/source/jgi/fungi.json").write_text(json.dumps({"organisms": [
+                    org("tape", "PURGED"), org("ready", "RESTORED")]}))
+                self.assertTrue(helpers.jgi_is_waiting("fungi", "tape"))
+                self.assertFalse(helpers.jgi_is_waiting("fungi", "ready"))
+                self.assertEqual(helpers.get_jgi_file_status("fungi", "tape"), "PURGED")
+            finally:
+                os.chdir(old_cwd)
+
+    def test_default_includes_waiting_genomes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                Path("outputs/metadata/source/jgi").mkdir(parents=True)
+                Path("outputs/metadata/source/jgi/fungi.json").write_text(json.dumps({"organisms": [
+                    org("tape", "PURGED"), org("ready", "RESTORED")]}))
+                with mock.patch.object(helpers, "get_expected_genome_paths", return_value=[
+                        "outputs/genomes/fungi/tape.fasta.gz", "outputs/genomes/fungi/ready.fasta.gz"]):
+                    todo = helpers.build_all_genomes_to_download(["fungi"], None, None, None)(None)
+                self.assertEqual(len(todo), 2)
             finally:
                 os.chdir(old_cwd)
 

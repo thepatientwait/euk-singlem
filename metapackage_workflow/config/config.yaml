@@ -8,16 +8,19 @@ groups:
 # (e.g. suppressed assemblies); set true to retry those on the next run.
 retry_failed_downloads: false
 
-# JGI genomes on tape (PURGED) cannot be downloaded until JGI restores them (up to ~24 h).
-# refresh_jgi_metadata: re-fetch the JGI file lists at the start of every real run so restore
-#   statuses are current; a file list is only rewritten (and dependents rerun) if it changed
+# JGI genomes on tape (PURGED) must be restored by JGI first (up to ~24 h).
 # request_jgi_restores: send batched restore requests as part of the download phase
-# jgi_skip_unrestored: leave genomes that are not yet RESTORED / BACKUP_COMPLETE out of the DAG
-#   (no queue time, no HTTP 409 failures)
-# jgi_max_concurrent: JGI download jobs allowed to run at once (the API fails when flooded)
-refresh_jgi_metadata: true
+# jgi_wait_for_restore: genomes not yet restored get a download job that polls JGI every
+#   jgi_poll_minutes and downloads once the file is restored. Attempts run 2 h, 4 h, 6 h
+#   (~12 h, about the life of a token); keep jgi_token in secrets.yaml current while it waits.
+#   false: such genomes get no job until a metadata refresh shows them restored.
+# jgi_max_concurrent: JGI downloads allowed to run at once (the API fails when flooded);
+#   jobs that are only waiting do not count
+# The JGI file lists are not re-fetched automatically; to refresh them (restore statuses):
+#   snakemake --forcerun download_jgi_metadata   (or delete outputs/metadata/source/jgi/*.json)
 request_jgi_restores: true
-jgi_skip_unrestored: true
+jgi_wait_for_restore: true
+jgi_poll_minutes: 15
 jgi_max_concurrent: 10
 
 # JGI API URLs for metadata download

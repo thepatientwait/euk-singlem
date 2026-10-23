@@ -19,6 +19,9 @@ MIN_TOKEN_SECONDS = 3600
 # tape, RESTORE_REGISTERED = restore requested but not finished) answers HTTP 409.
 DOWNLOADABLE_STATUSES = frozenset({"RESTORED", "BACKUP_COMPLETE"})
 
+# Not downloadable yet but will become so: on tape, or restore requested and still running.
+WAITING_STATUSES = frozenset({"PURGED", "RESTORE_REGISTERED"})
+
 # Generous because the JGI API is slow when busy; a too-short timeout only adds more load
 # through retries.
 API_TIMEOUT = 120
@@ -61,6 +64,18 @@ def check_token(token, min_seconds=MIN_TOKEN_SECONDS):
             "config/secrets.yaml before starting."
         )
     return left
+
+
+def read_token(secrets_path, fallback=None):
+    """Current ``jgi_token`` from the secrets file, so a token pasted in while a job waits is
+    picked up; falls back to the value the workflow was started with."""
+    try:
+        import yaml
+        with open(secrets_path, "r", encoding="utf-8") as handle:
+            token = (yaml.safe_load(handle) or {}).get("jgi_token")
+        return token or fallback
+    except Exception:
+        return fallback
 
 
 def make_session(token):

@@ -1,71 +1,54 @@
 #!/usr/bin/env python3
-"""Refresh a JGI group file list (``{group}.json``) so tape-restore statuses stay current.
+"""Write a JGI group file list (``{group}.json``) only when its content changed.
 
-File statuses (PURGED -> RESTORE_REGISTERED -> RESTORED) change on JGI's side while a restore
-runs. The workflow calls :func:`refresh_group` once per run, before the DAG is built.
-
-The JSON is only replaced when the organisms actually changed, so an unchanged catalogue keeps
-its mtime and triggers no reruns. Any failure keeps the existing file: a flaky API must
-never break (or truncate) the metadata a run depends on.
+Used by the ``download_jgi_metadata`` rule. The rule is not re-run automatically (its outputs
+exist and it has no inputs); redo it on purpose with ``--forcerun download_jgi_metadata`` or by
+deleting the output. Rewriting only on change keeps the mtime of an unchanged catalogue, so a
+forced refresh of an identical list triggers no reruns downstream.
 """
-import collections
 import json
 import os
 from pathlib import Path
 
-try:
-    from jgi_common import fetch_all_pages
-except ImportError:  # imported as scripts.refresh_jgi_metadata
-    from scripts.jgi_common import fetch_all_pages
-
 # Refuse a refreshed list that lost more than this share of the organisms (truncated answer).
 MIN_SIZE_RATIO = 0.9
-
-
-def _status_counts(organisms):
-    counts = collections.Counter()
-    for org in organisms:
-        files = org.get("files") or []
-        if not files:
-            counts["NOFILES"] += 1
-            continue
-        biggest = max(files, key=lambda f: int(f.get("file_size") or 0))
-        counts[biggest.get("file_status", "UNKNOWN")] += 1
-    return counts
 
 
 def _key(organisms):
     return json.dumps(organisms, sort_keys=True, separators=(",", ":"))
 
 
-def refresh_group(group, json_url, json_path, logger):
-    """Re-download ``json_url`` into ``json_path`` if it changed. Returns True if replaced."""
+def write_json_if_changed(json_path, new, logger, label=""):
+    """Replace ``json_path`` with ``new`` if the organisms differ (or it is missing).
+
+    Returns True if the file was written. Raises if the new list looks truncated.
+    """
     json_path = Path(json_path)
-    if not json_path.exists():
-        return False  # the download_jgi_metadata checkpoint creates it
-    try:
-        new = fetch_all_pages(json_url, logger, label=f"for {group}")
+    new_orgs = new.get("organisms", [])
+    old_orgs = []
+    if json_path.exists():
         with open(json_path, "r", encoding="utf-8") as handle:
-            old = json.load(handle)
-    except Exception as exc:  # network, JSON or HTTP errors: keep what we have
-        logger.warning("JGI %s: metadata refresh failed (%s: %s); keeping existing %s",
-                       group, type(exc).__name__, exc, json_path)
-        return False
+            old_orgs = json.load(handle).get("organisms", [])
+        if old_orgs and len(new_orgs) < MIN_SIZE_RATIO * len(old_orgs):
+            raise RuntimeError(f"JGI {label}: refreshed list has {len(new_orgs)} organisms vs {len(old_orgs)}; "
+                               f"refusing it, keeping {json_path}")
+        if _key(old_orgs) == _key(new_orgs):
+            logger.info("JGI %s: metadata unchanged (%d organisms), %s left as is", label, len(new_orgs), json_path)
+            return False
 
-    old_orgs, new_orgs = old.get("organisms", []), new.get("organisms", [])
-    if old_orgs and len(new_orgs) < MIN_SIZE_RATIO * len(old_orgs):
-        logger.warning("JGI %s: refreshed list has %d organisms vs %d; refusing it, keeping %s",
-                       group, len(new_orgs), len(old_orgs), json_path)
-        return False
-    if _key(old_orgs) == _key(new_orgs):
-        logger.info("JGI %s: metadata unchanged (%d organisms)", group, len(new_orgs))
-        return False
-
+    json_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = json_path.with_name(json_path.name + ".tmp")
     with open(tmp, "w", encoding="utf-8") as handle:
         json.dump(new, handle)
     os.replace(tmp, json_path)
-    logger.info("JGI %s: metadata updated, %d -> %d organisms; best-file status %s -> %s",
-                group, len(old_orgs), len(new_orgs),
-                dict(_status_counts(old_orgs)), dict(_status_counts(new_orgs)))
+    logger.info("JGI %s: metadata written, %d -> %d organisms", label, len(old_orgs), len(new_orgs))
+    return True
+
+
+def write_bytes_if_changed(path, content):
+    path = Path(path)
+    if path.exists() and path.read_bytes() == content:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
     return True

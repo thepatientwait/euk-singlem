@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """Download one JGI genome that is already on disk at JGI (RESTORED / BACKUP_COMPLETE).
 
-Files that are still on tape (PURGED) or mid-restore (RESTORE_REGISTERED) are NOT waited for:
-use the jgi_request_restore rule, then run again once the restore has finished. A
+Files that are still on tape (PURGED) or mid-restore (RESTORE_REGISTERED) are waited for when
+``params.wait`` is set: the job re-queries the file status every ``params.poll_seconds`` and
+downloads as soon as it is RESTORED. The wait has no limit of its own; the scheduler's walltime
+ends the attempt and Snakemake retries it with a longer one. Without ``wait`` such a file fails at
+once. The token is re-read from the secrets file before every authenticated call, and a
 rejected/expired token fails immediately.
 """
 import gzip
 import os
+import random
 import shutil
+import time
 import zipfile
 from pathlib import Path
 
@@ -15,13 +20,16 @@ from jgi_common import (
     API_TIMEOUT,
     DOWNLOADABLE_STATUSES,
     JDP_DOWNLOAD_URL,
+    JDP_RESTORE_URL,
     JDP_SEARCH_URL,
     JgiAuthError,
     JgiNotRestoredError,
     check_token,
     make_session,
     request_with_retries,
+    read_token,
     restore_entry,
+    WAITING_STATUSES,
 )
 from log_config import configure_logger
 
@@ -54,45 +62,102 @@ def find_file(organisms, genome_acc, target_filename):
     return None, None
 
 
+def refused_restore(report, genome_acc):
+    """True if jgi_request_restore recorded that JGI cannot restore this genome (nothing to wait for)."""
+    if not report or not os.path.exists(report):
+        return False
+    with open(report, "r", encoding="utf-8") as handle:
+        for line in handle:
+            fields = line.rstrip("\n").split("\t")
+            if fields[0] == genome_acc:
+                return len(fields) > 2 and fields[2] == "restore_refused"
+    return False
+
+
+def query_file(genome_acc, target_filename, anonymous, authed):
+    """Current (org, file) from the JDP file list. Anonymous first (like the group list); if JGI
+    insists on a token, fall back to the authenticated session."""
+    query = dict(params={"organism": genome_acc, "api_version": 2, "a": "false", "h": "false",
+                         "d": "asc", "p": 1, "x": 50, "t": "simple"}, timeout=API_TIMEOUT)
+    try:
+        response = request_with_retries(anonymous, "GET", JDP_SEARCH_URL, logger, **query)
+    except JgiAuthError:
+        response = request_with_retries(authed(), "GET", JDP_SEARCH_URL, logger, **query)
+    if response.status_code != 200:
+        raise RuntimeError(f"Mycocosm file list query failed: HTTP {response.status_code}: {response.text[:300]}")
+    return find_file(response.json().get("organisms", []), genome_acc, target_filename)
+
+
 def main():
+    import requests
+
     genome_acc = snakemake.wildcards.genome_acc
     output_file = Path(snakemake.output.genome)
     target_filename = snakemake.params.name
-    token = snakemake.params.token
+    initial_token = snakemake.params.token
+    secrets_path = snakemake.params.secrets
+    wait = bool(snakemake.params.wait)
+    poll_seconds = float(snakemake.params.poll_seconds)
+    request_restore = bool(snakemake.params.request_restore)
+    not_ready_report = snakemake.input.get("not_ready")
 
     if output_file.exists() and output_file.stat().st_size > 0:
         logger.info("Genome already present, skipping download: %s", output_file)
         return
 
-    check_token(token)
+    def fresh_token():
+        token = read_token(secrets_path, initial_token)
+        check_token(token, min_seconds=300)  # the call itself only needs a few minutes
+        return token
+
+    def authed():
+        return make_session(fresh_token())
+
+    if not wait:
+        check_token(read_token(secrets_path, initial_token))
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
     downloaded_file = output_file.parent / target_filename
     temp_zip_file = output_file.parent / f"{genome_acc}_download.zip"
-    session = make_session(token)
+    anonymous = requests.Session()
 
-    response = request_with_retries(
-        session, "GET", JDP_SEARCH_URL, logger, timeout=API_TIMEOUT,
-        params={"organism": genome_acc, "api_version": 2, "a": "false", "h": "false",
-                "d": "asc", "p": 1, "x": 50, "t": "simple"},
-    )
-    if response.status_code != 200:
-        raise RuntimeError(f"Mycocosm file list query failed: HTTP {response.status_code}: {response.text[:300]}")
-    org, file_obj = find_file(response.json().get("organisms", []), genome_acc, target_filename)
+    restore_sent = False
+    waited = 0
+    while True:
+        org, file_obj = query_file(genome_acc, target_filename, anonymous, authed)
+        if file_obj is None:
+            logger.warning("No file matching %s / %s on JDP; writing an empty failure marker.", genome_acc, target_filename)
+            output_file.touch()
+            return
 
-    if file_obj is None:
-        logger.warning("No file matching %s / %s on JDP; writing an empty failure marker.", genome_acc, target_filename)
-        output_file.touch()
-        return
+        status = file_obj.get("file_status", "UNKNOWN")
+        logger.info("Target file %s status: %s", file_obj["_id"], status)
+        if status in DOWNLOADABLE_STATUSES:
+            break
+        if not wait or status not in WAITING_STATUSES:
+            # A download attempt would only answer HTTP 409; fail at once and do not retry
+            raise JgiNotRestoredError(
+                f"{genome_acc} is not downloadable (status {status}) and waiting is "
+                f"{'not enabled' if not wait else 'pointless for this status'}."
+            )
+        if refused_restore(not_ready_report, genome_acc):
+            raise JgiNotRestoredError(f"{genome_acc}: JGI refused the restore request; nothing to wait for.")
+        if status == "PURGED" and request_restore and not restore_sent:
+            org_key, sub = restore_entry(org, file_obj)
+            payload = {"ids": {org_key: sub}, "send_mail": False, "api_version": "2"}
+            resp = request_with_retries(authed(), "POST", JDP_RESTORE_URL, logger, json=payload, timeout=60)
+            if resp.status_code >= 400:
+                raise JgiNotRestoredError(f"{genome_acc}: restore request refused: HTTP {resp.status_code} {resp.text[:200]}")
+            logger.info("Restore requested: HTTP %d %s", resp.status_code, resp.text[:200].replace("\n", " "))
+            restore_sent = True
+        delay = poll_seconds * random.uniform(0.9, 1.1)
+        logger.info("Waiting for JGI to restore the file (%.0f min so far); next check in %.0f min",
+                    waited / 60, delay / 60)
+        time.sleep(delay)
+        waited += delay
 
-    status = file_obj.get("file_status", "UNKNOWN")
-    logger.info("Target file %s status: %s", file_obj["_id"], status)
-    if status not in DOWNLOADABLE_STATUSES:
-        # A download attempt would only answer HTTP 409; fail at once and do not retry
-        raise JgiNotRestoredError(
-            f"{genome_acc} is not downloadable yet (status {status}). Run the jgi_request_restore "
-            "rule and download after the restore has completed (up to ~24 h)."
-        )
+    # authenticated from here on, with a token read right now (it may have been replaced meanwhile)
+    session = authed()
 
     org_key, sub = restore_entry(org, file_obj)
     payload = {"ids": {org_key: sub}, "send_mail": False, "api_version": "2"}
