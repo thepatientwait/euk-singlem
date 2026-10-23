@@ -1,7 +1,7 @@
 metapackage:
-  singlem_input_dir: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/singlem_input"
-  valid_packages_manifest: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/euk_packages/valid_singlem_packages.txt"
-  taxonomy_mapping: "/home/n9985158/phd/euk-singlem/metapackage_workflow/outputs/metadata/taxonomy/taxonomy_mapping.tsv"
+  singlem_input_dir: "../metapackage_workflow/outputs/singlem/input"
+  valid_packages_manifest: "../metapackage_workflow/outputs/metadata/qc/valid_singlem_packages.txt"
+  taxonomy_mapping: "../metapackage_workflow/outputs/metadata/taxonomy/taxonomy_mapping.tsv"
 
 external:
   enabled: true
