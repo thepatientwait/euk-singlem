@@ -4,8 +4,8 @@
     <publish_dir>/<YYYY-MM-DD_HHMMSS>[_subset_<name>]/
         <derep>/<copies>/tree.nwk, tree.rerooted.nwk, red_decorated.tree, red_cutoffs.dict,
                          tree_metadata.tsv, taxonomy.revised_reference.tsv,
-                         target_novelty_taxonomy.tsv, notebooks/*.ipynb
-        conservative_taxonomy.tsv, comparison/tree_comparison.ipynb
+                         target_novelty_taxonomy.tsv
+        conservative_taxonomy.tsv, notebooks/tree_diagnostics.ipynb, notebooks/tree_accuracy.ipynb
         MANIFEST.tsv   (every file with size and md5)
         RUN_INFO.txt   (date, git commit, settings)
 

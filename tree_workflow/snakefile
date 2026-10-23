@@ -198,7 +198,8 @@ def _abs(path):
     return str((ROOT / path).resolve())
 
 
-COMPARISON_DIR = ("output" if SUBSET == "none" else SUBSET_DIR) + "/comparison"
+# one folder for the global notebooks (they compare all {derep} x {copies} variants)
+NOTEBOOK_DIR = ("output" if SUBSET == "none" else SUBSET_DIR) + "/notebooks"
 PUBLISH_DIR = str(config.get("publish_dir", TREE_CONFIG.get("publish_dir", "~/trees")))   # `--config publish_dir=...` overrides
 PUBLISH_MARKER = ("output" if SUBSET == "none" else SUBSET_DIR) + "/published_to.txt"
 
@@ -211,9 +212,8 @@ rule all:
     input:
         expand(TREE_PATHS["rerooted_newick"], derep=DEREP_MODES, copies=COPY_MODES),
         expand(TAXONOMY_PATHS["metadata"], derep=DEREP_MODES, copies=COPY_MODES),
-        expand(TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.ipynb", derep=DEREP_MODES, copies=COPY_MODES),
-        expand(TREE_PATHS["diagnostics_dir"] + "/tree_accuracy.ipynb", derep=DEREP_MODES, copies=COPY_MODES),
-        COMPARISON_DIR + "/tree_comparison.ipynb",
+        NOTEBOOK_DIR + "/tree_diagnostics.ipynb",
+        NOTEBOOK_DIR + "/tree_accuracy.ipynb",
         PUBLISH_MARKER
 
 
@@ -597,110 +597,93 @@ rule generate_alignment:
         str(TREE_SCRIPTS / "generate_alignment.py")
 
 
+def _variants():
+    """One entry per {derep} x {copies} tree: label and absolute paths of its files."""
+    return [
+        {"label": f"{d}/{c}", "derep": d, "copies": c,
+         "tree": _abs(TREE_PATHS["newick"].format(derep=d, copies=c)),
+         "alignment": _abs(TREE_PATHS["alignment"].format(derep=d, copies=c)),
+         "partitions": _abs(TREE_PATHS["partitions"].format(derep=d, copies=c)),
+         "merged_dir": str(Path(_abs(MERGED_PATHS["gene_faa"].format(derep=d, copies=c, gene="x"))).parent),
+         "red_tree": _abs(TAXONOMY_PATHS["red_tree"].format(derep=d, copies=c)),
+         "red_dict": _abs(TAXONOMY_PATHS["red_cutoffs"].format(derep=d, copies=c)),
+         "red_tsv": _abs(TAXONOMY_PATHS["red_cutoffs"].format(derep=d, copies=c).rsplit(".", 1)[0] + ".tsv")}
+        for d in DEREP_MODES for c in COPY_MODES
+    ]
+
+
+def _busco_manifests():
+    return [{"manifest": _abs(METAPACKAGE_BUSCO_QC), "base": _abs(METAPACKAGE_ROOT)},
+            {"manifest": _abs(EXTERNAL_PATHS["metadata"]["busco_qc"]), "base": _abs(ROOT)}]
+
+
+def _run_label():
+    return "all variants" + ("" if SUBSET == "none" else f" (subset {SUBSET})")
+
+
+# Global notebook, alignment side: occupancy, gene overlap and divergence within vs between clades,
+# per-gene separation, single vs multi copy, multicopy heuristic. All variants side by side.
 rule tree_diagnostics:
-    """Executed notebook on the supermatrix (and trees, if built): occupancy, gene overlap and
-    divergence within vs between clades, per-gene separation, multicopy heuristic check."""
     input:
-        alignment = TREE_PATHS["alignment"],
-        partitions = TREE_PATHS["partitions"],
-        taxonomy = TAXONOMY_PATHS["conservative"]
-    output:
-        notebook = TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.ipynb"
-    params:
-        notebook = str(ROOT / "notebooks" / "tree_diagnostics.ipynb"),
-        nb_params = lambda wildcards, input: {
-            "label": f"{wildcards.derep}/{wildcards.copies}" + ("" if SUBSET == "none" else f" (subset {SUBSET})"),
-            "scripts_dir": str(TREE_SCRIPTS.resolve()),
-            "alignment": str(Path(input.alignment).resolve()),
-            "partitions": str(Path(input.partitions).resolve()),
-            "taxonomy": str(Path(input.taxonomy).resolve()),
-            # read if present when the notebook runs; not a rule input, so it never waits for the tree
-            "trees": [str(Path(TREE_PATHS["rerooted_newick"].format(derep=wildcards.derep, copies=wildcards.copies)).resolve())],
-            "merged_dir": str(Path(MERGED_PATHS["gene_faa"].format(derep=wildcards.derep, copies=wildcards.copies, gene="x")).parent.resolve()),
-            "busco_manifests": [
-                {"manifest": str(Path(METAPACKAGE_BUSCO_QC).resolve()), "base": str(METAPACKAGE_ROOT.resolve())},
-                {"manifest": str(Path(EXTERNAL_PATHS["metadata"]["busco_qc"]).resolve()), "base": str(ROOT.resolve())},
-            ],
-            "n_pairs": int(TREE_CONFIG.get("diagnostics_pairs", 2000)),
-            "max_multicopy_cases": int(TREE_CONFIG.get("diagnostics_multicopy_cases", 400)),
-        }
-    threads: 1
-    retries: TOTAL_ATTEMPTS
-    resources: **RESOURCE_PROFILE(mem_scale=2)
-    log:
-        log_path("tree_diagnostics", "derep", "copies")
-    conda:
-        env("diagnostics")
-    script:
-        str(TREE_SCRIPTS / "run_notebook.py")
-
-
-# Rooting-independent clade fragmentation, support of the fragmenting splits, misplaced tips and
-# RED statistics of one tree (notebooks/tree_accuracy.ipynb).
-rule tree_accuracy:
-    input:
-        tree = TREE_PATHS["newick"],
-        taxonomy = TAXONOMY_PATHS["conservative"],
-        red_tree = TAXONOMY_PATHS["red_tree"],
-        red_cutoffs = TAXONOMY_PATHS["red_cutoffs"],
-        reference = TAXONOMY_PATHS["reference"]
-    output:
-        notebook = TREE_PATHS["diagnostics_dir"] + "/tree_accuracy.ipynb"
-    params:
-        notebook = str(ROOT / "notebooks" / "tree_accuracy.ipynb"),
-        nb_params = lambda wildcards, input: {
-            "label": f"{wildcards.derep}/{wildcards.copies}" + ("" if SUBSET == "none" else f" (subset {SUBSET})"),
-            "scripts_dir": _abs(TREE_SCRIPTS),
-            "tree": _abs(input.tree),
-            "taxonomy": _abs(input.taxonomy),
-            "taxonomy_mapping": _abs(METAPACKAGE_TAXONOMY),
-            "red_tree": _abs(input.red_tree),
-            "red_dict": _abs(input.red_cutoffs),
-            "red_tsv": _abs(str(input.red_cutoffs).rsplit(".", 1)[0] + ".tsv"),
-            "busco_manifests": [
-                {"manifest": _abs(METAPACKAGE_BUSCO_QC), "base": _abs(METAPACKAGE_ROOT)},
-                {"manifest": _abs(EXTERNAL_PATHS["metadata"]["busco_qc"]), "base": _abs(ROOT)},
-            ],
-        }
-    threads: 1
-    retries: TOTAL_ATTEMPTS
-    resources: **RESOURCE_PROFILE(mem_scale=2)
-    log:
-        log_path("tree_accuracy", "derep", "copies")
-    conda:
-        env("diagnostics")
-    script:
-        str(TREE_SCRIPTS / "run_notebook.py")
-
-
-# Compares all {derep} x {copies} trees: Robinson-Foulds, fragmentation, single vs multi copy.
-rule tree_comparison:
-    input:
-        trees = expand(TREE_PATHS["newick"], derep=DEREP_MODES, copies=COPY_MODES),
+        # the template: editing the notebook re-runs it
+        template = str(ROOT / "notebooks" / "tree_diagnostics.ipynb"),
         alignments = expand(TREE_PATHS["alignment"], derep=DEREP_MODES, copies=COPY_MODES),
         partitions = expand(TREE_PATHS["partitions"], derep=DEREP_MODES, copies=COPY_MODES),
         taxonomy = TAXONOMY_PATHS["conservative"]
     output:
-        notebook = COMPARISON_DIR + "/tree_comparison.ipynb"
+        notebook = NOTEBOOK_DIR + "/tree_diagnostics.ipynb"
     params:
-        notebook = str(ROOT / "notebooks" / "tree_comparison.ipynb"),
+        notebook = str(ROOT / "notebooks" / "tree_diagnostics.ipynb"),
         nb_params = lambda wildcards, input: {
+            "label": _run_label(),
             "scripts_dir": _abs(TREE_SCRIPTS),
             "taxonomy": _abs(input.taxonomy),
-            "n_pairs": int(TREE_CONFIG.get("diagnostics_pairs", 2000)) // 2,
-            "trees": [
-                {"label": f"{d}/{c}", "derep": d, "copies": c,
-                 "tree": _abs(TREE_PATHS["newick"].format(derep=d, copies=c)),
-                 "alignment": _abs(TREE_PATHS["alignment"].format(derep=d, copies=c)),
-                 "partitions": _abs(TREE_PATHS["partitions"].format(derep=d, copies=c))}
-                for d in DEREP_MODES for c in COPY_MODES
-            ],
+            "variants": _variants(),
+            "busco_manifests": _busco_manifests(),
+            "n_pairs": int(TREE_CONFIG.get("diagnostics_pairs", 2000)),
+            "max_multicopy_cases": int(TREE_CONFIG.get("diagnostics_multicopy_cases", 400)),
+            "out_dir": _abs(NOTEBOOK_DIR + "/tables/tree_diagnostics"),
         }
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=4)
     log:
-        log_path("tree_comparison")
+        log_path("tree_diagnostics")
+    conda:
+        env("diagnostics")
+    script:
+        str(TREE_SCRIPTS / "run_notebook.py")
+
+
+# Global notebook, tree side: clade fragmentation, support, misplaced tips, RED, and the
+# differences between the variants (Robinson-Foulds, names that change).
+rule tree_accuracy:
+    input:
+        # the template: editing the notebook re-runs it
+        template = str(ROOT / "notebooks" / "tree_accuracy.ipynb"),
+        trees = expand(TREE_PATHS["newick"], derep=DEREP_MODES, copies=COPY_MODES),
+        red_trees = expand(TAXONOMY_PATHS["red_tree"], derep=DEREP_MODES, copies=COPY_MODES),
+        red_cutoffs = expand(TAXONOMY_PATHS["red_cutoffs"], derep=DEREP_MODES, copies=COPY_MODES),
+        references = expand(TAXONOMY_PATHS["reference"], derep=DEREP_MODES, copies=COPY_MODES),
+        taxonomy = TAXONOMY_PATHS["conservative"]
+    output:
+        notebook = NOTEBOOK_DIR + "/tree_accuracy.ipynb"
+    params:
+        notebook = str(ROOT / "notebooks" / "tree_accuracy.ipynb"),
+        nb_params = lambda wildcards, input: {
+            "label": _run_label(),
+            "scripts_dir": _abs(TREE_SCRIPTS),
+            "taxonomy": _abs(input.taxonomy),
+            "taxonomy_mapping": _abs(METAPACKAGE_TAXONOMY),
+            "variants": _variants(),
+            "busco_manifests": _busco_manifests(),
+            "out_dir": _abs(NOTEBOOK_DIR + "/tables/tree_accuracy"),
+        }
+    threads: 1
+    retries: TOTAL_ATTEMPTS
+    resources: **RESOURCE_PROFILE(mem_scale=2)
+    log:
+        log_path("tree_accuracy")
     conda:
         env("diagnostics")
     script:
@@ -728,12 +711,11 @@ def _publish_pairs():
                 (TAXONOMY_PATHS["metadata"].format(**wc), f"{out}/tree_metadata.tsv"),
                 (TAXONOMY_PATHS["reference"].format(**wc), f"{out}/taxonomy.revised_reference.tsv"),
                 (TAXONOMY_PATHS["target"].format(**wc), f"{out}/target_novelty_taxonomy.tsv"),
-                (TREE_PATHS["diagnostics_dir"].format(**wc) + "/tree_diagnostics.ipynb", f"{out}/notebooks/tree_diagnostics.ipynb"),
-                (TREE_PATHS["diagnostics_dir"].format(**wc) + "/tree_accuracy.ipynb", f"{out}/notebooks/tree_accuracy.ipynb"),
             ]
     pairs += [
         (TAXONOMY_PATHS["conservative"], "conservative_taxonomy.tsv"),
-        (COMPARISON_DIR + "/tree_comparison.ipynb", "comparison/tree_comparison.ipynb"),
+        (NOTEBOOK_DIR + "/tree_diagnostics.ipynb", "notebooks/tree_diagnostics.ipynb"),
+        (NOTEBOOK_DIR + "/tree_accuracy.ipynb", "notebooks/tree_accuracy.ipynb"),
     ]
     return pairs
 

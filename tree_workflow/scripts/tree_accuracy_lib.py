@@ -1,4 +1,4 @@
-"""Tree-accuracy statistics for notebooks/tree_accuracy.ipynb and notebooks/tree_comparison.ipynb.
+"""Tree-accuracy statistics for notebooks/tree_accuracy.ipynb.
 
 * ``fragmentation``: rooting-independent monophyly. A *piece* of a clade name is a maximal part of
   the unrooted tree (one side of an edge) whose labelled tips all carry that name; a monophyletic

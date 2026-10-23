@@ -49,6 +49,5 @@ paths:
     bmge: "output/{derep}/{copies}/bmge/{gene}_bmge.fasta"
     alignment: "output/{derep}/{copies}/alignments/concatinated_alignment.fasta"
     partitions: "output/{derep}/{copies}/alignments/partitions.tsv"
-    diagnostics_dir: "output/{derep}/{copies}/diagnostics"
     newick: "output/{derep}/{copies}/tree/tree.nwk"
     rerooted_newick: "output/{derep}/{copies}/tree/tree.rerooted.nwk"

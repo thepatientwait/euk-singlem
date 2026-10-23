@@ -99,24 +99,23 @@ in `config.yaml`), i.e. up to four trees:
   FASTA says which sequences are Duplicated, and `merge_gene_fastas` filters on it.
 
 Outputs are under `output/{derep}/{copies}/`. FastTree runs with the protein model
-(`tree.fasttree_args`, default `-lg -gamma`). Per tree, after the alignment and the taxonomy:
+(`tree.fasttree_args`, default `-lg -gamma`). Two **global notebooks** (one executed copy each in
+`output/notebooks/`, covering every `{derep}/{copies}` variant side by side, mostly as figures; the
+numbers and PNG copies of each figure are in `output/notebooks/tables/<notebook>/`):
 
-- `tree_diagnostics` (`notebooks/tree_diagnostics.ipynb`): gene occupancy, gene overlap and
-  divergence within vs between clades, per-gene separation, multicopy top-hit check.
-- `tree_accuracy` (`notebooks/tree_accuracy.ipynb`): rooting-independent clade fragmentation,
-  support of the fragmenting splits, tips that look misplaced (sister-group swaps excluded) versus
-  BUSCO completeness/duplication and taxonomy status, and RED statistics.
-- `tree_comparison` (once, `output/comparison/`): Robinson-Foulds distances between the trees,
-  fragmentation side by side, single- vs multi-copy per-gene separation.
+- `tree_diagnostics` (`notebooks/tree_diagnostics.ipynb`, alignment side): gene occupancy, divergence and
+  gene overlap within vs between clades, per-gene separation, single vs multi copy, multicopy top-hit check.
+- `tree_accuracy` (`notebooks/tree_accuracy.ipynb`, tree side): rooting-independent clade fragmentation,
+  support of the fragmenting splits, tips that look misplaced (sister-group swaps excluded) versus BUSCO
+  completeness/duplication and taxonomy status, RED statistics, and Robinson-Foulds distances between variants.
 
-The notebooks in `notebooks/` are templates; each rule writes an executed copy (`tree_diagnostics.ipynb`,
-`tree_accuracy.ipynb`, `tree_comparison.ipynb`) with its outputs and figures into the output folder.
-`scripts/tree_fragmentation.py` can also compare finished trees from the command line.
+The notebooks in `notebooks/` are templates; the rules execute them and write the copy with outputs
+and figures. `scripts/tree_fragmentation.py` can also compare finished trees from the command line.
 
 `publish_trees` (part of `rule all`) copies the final trees and their metadata into a new
 `<tree.publish_dir>/<YYYY-MM-DD_HHMMSS>[_subset_<name>]/` directory (default `~/trees`; override with
 `--config publish_dir=...`): per `{derep}/{copies}` the `tree.nwk`, `tree.rerooted.nwk`, the RED-decorated
-tree and cutoffs, `tree_metadata.tsv`, the reference/target taxonomy and the executed notebooks, plus
+tree and cutoffs, `tree_metadata.tsv` and the reference/target taxonomy, plus the two global notebooks,
 `MANIFEST.tsv` (size, md5), `RUN_INFO.txt` (git commit, settings) and a `latest` symlink. Every publish
 gets its own directory; it re-runs only when a published file changed.
 
