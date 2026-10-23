@@ -168,7 +168,7 @@ MERGED_BMGE_TARGETS   = build_merged_bmge_targets_factory(TREE_PATHS, MERGED_GEN
 MERGED_TAXONOMY_INPUT = build_merged_taxonomy_input_factory(EXTERNAL_PATHS, METAPACKAGE_TAXONOMY, USE_EXTERNAL)
 
 
-localrules: make_subset_list, merge_gene_fastas, build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
+localrules: make_subset_list, merge_gene_fastas, build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
 
 # The tree is built once per {derep} x {copy} value:
 #   single Complete BUSCO genes only
@@ -721,75 +721,23 @@ rule build_tree:
         FastTreeMP {params.args} {input} > {output}
         """
 
-if OUTGROUP_ENABLED:
-    rule reroot_tree:
-        input:
-            tree = TREE_PATHS["newick"]
-        output:
-            rerooted_tree = TREE_PATHS["rerooted_newick"]
-        retries: TOTAL_ATTEMPTS
-        resources: **DEFAULT_RESOURCES
-        log:
-            log_path("reroot_tree", "derep", "copies")
-        conda:
-            env("taxonomy")
-        run:
-            with redirect_to_log(log[0]):
-                import dendropy
-
-                # Load the tree with force-rooted option to properly handle tree state
-                tree = dendropy.Tree.get(
-                    path=input.tree, 
-                    schema="newick", 
-                    preserve_underscores=True, 
-                    rooting="force-rooted"
-                )
-
-                # Filter keys from the global OUTGROUP_GENOME_MAP that exist in the tree
-                valid_taxa = [acc for acc in OUTGROUP_GENOME_MAP.keys() if acc in tree.taxon_namespace.labels()]
-
-                if valid_taxa and len(valid_taxa) > 1:
-                    # Find the Most Recent Common Ancestor (MRCA) of these outgroup genomes
-                    mrca_node = tree.mrca(taxon_labels=valid_taxa)
-                
-                    if mrca_node and mrca_node.edge:
-                        edge_length = mrca_node.edge.length
-                        length_split = 0.5 * edge_length if edge_length is not None else None
-                    
-                        # Reroot the tree at the edge leading to the MRCA clade
-                        tree.reroot_at_edge(
-                            mrca_node.edge, 
-                            length1=length_split, 
-                            length2=length_split, 
-                            update_bipartitions=False
-                        )
-
-                else:
-                    # If no valid outgroup taxa are found, fallback to midpoint rooting
-                    tree.reroot_at_midpoint(update_bipartitions=False)
-
-                # Write out the updated tree
-                tree.write(path=output.rerooted_tree, schema="newick", unquoted_underscores=True)
-
-else:
-    rule reroot_tree:
-        input:
-            tree = TREE_PATHS["newick"]
-        output:
-            rerooted_tree = TREE_PATHS["rerooted_newick"]
-        retries: TOTAL_ATTEMPTS
-        resources: **DEFAULT_RESOURCES
-        log:
-            log_path("reroot_tree", "derep", "copies")
-        conda:
-            env("taxonomy")
-        run:
-            with redirect_to_log(log[0]):
-                import dendropy
-
-                tree = dendropy.Tree.get(path=input.tree, schema="newick", preserve_underscores=True)
-                tree.reroot_at_midpoint(update_bipartitions=False)
-                tree.write(path=output.rerooted_tree, schema="newick", unquoted_underscores=True)
+rule reroot_tree:
+    """Midpoint root, or the outgroup's MRCA edge when the outgroup is enabled. A script: rule
+    so that the taxonomy env (dendropy) is used."""
+    input:
+        tree = TREE_PATHS["newick"]
+    output:
+        rerooted_tree = TREE_PATHS["rerooted_newick"]
+    params:
+        outgroup = sorted(OUTGROUP_GENOME_MAP) if OUTGROUP_ENABLED else []
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    log:
+        log_path("reroot_tree", "derep", "copies")
+    conda:
+        env("taxonomy")
+    script:
+        str(TREE_SCRIPTS / "reroot_tree.py")
 
 
 rule prepare_taxonomy:
