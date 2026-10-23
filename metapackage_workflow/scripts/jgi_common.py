@@ -37,10 +37,19 @@ class JgiNotRestoredError(RuntimeError):
     """The file is still on tape; request a restore and download it on a later pass."""
 
 
+def normalize_token(token):
+    """The bare JWT: any number of leading ``Bearer`` prefixes (a double paste is easy to make)
+    and surrounding whitespace removed. Every use of the token goes through this."""
+    token = (token or "").strip()
+    while token.lower().startswith("bearer "):
+        token = token[7:].strip()
+    return token
+
+
 def token_seconds_left(token):
     """Seconds until the JWT expires (negative if expired); None if it has no readable ``exp``."""
     try:
-        payload = token.replace("Bearer ", "").strip().split(".")[1]
+        payload = normalize_token(token).split(".")[1]
         data = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
         return float(data["exp"]) - time.time()
     except Exception:
@@ -49,8 +58,12 @@ def token_seconds_left(token):
 
 def check_token(token, min_seconds=MIN_TOKEN_SECONDS):
     """Raise JgiAuthError if the token is missing or (nearly) expired. Never prints the token."""
+    token = normalize_token(token)
     if not token:
         raise JgiAuthError("JGI token missing: set jgi_token in config/secrets.yaml.")
+    if token.count(".") != 2:
+        raise JgiAuthError("jgi_token in config/secrets.yaml is not a JWT (expected three dot-separated parts); "
+                           "copy it again from the JGI token page.")
     left = token_seconds_left(token)
     if left is None:
         return None  # not a readable JWT; let the server decide
@@ -73,7 +86,7 @@ def read_token(secrets_path, fallback=None):
         import yaml
         with open(secrets_path, "r", encoding="utf-8") as handle:
             token = (yaml.safe_load(handle) or {}).get("jgi_token")
-        return token or fallback
+        return normalize_token(token) or fallback
     except Exception:
         return fallback
 
@@ -81,7 +94,7 @@ def read_token(secrets_path, fallback=None):
 def make_session(token):
     session = requests.Session()
     session.headers.update({
-        "Authorization": token if token.startswith("Bearer ") else f"Bearer {token}",
+        "Authorization": f"Bearer {normalize_token(token)}",
         "Accept": "application/json, application/zip, application/octet-stream",
         "Content-Type": "application/json",
     })

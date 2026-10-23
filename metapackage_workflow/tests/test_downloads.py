@@ -32,6 +32,29 @@ class FakeLogger:
         return lambda *a, **k: None
 
 
+def fake_jwt(exp_offset=7200):
+    import base64, time
+    enc = lambda d: base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b"=").decode()
+    return f"{enc({'alg': 'none'})}.{enc({'exp': time.time() + exp_offset})}.sig"
+
+
+class TestToken(unittest.TestCase):
+    def test_double_bearer_is_normalised(self):
+        jwt = fake_jwt()
+        for raw in (jwt, f"Bearer {jwt}", f"Bearer Bearer {jwt}", f"  bearer   {jwt}\n"):
+            self.assertEqual(jgi_common.normalize_token(raw), jwt)
+            self.assertGreater(jgi_common.check_token(raw), 3600)
+            self.assertEqual(jgi_common.make_session(raw).headers["Authorization"], f"Bearer {jwt}")
+
+    def test_garbage_and_expired_fail(self):
+        with self.assertRaises(jgi_common.JgiAuthError):
+            jgi_common.check_token("Bearer not-a-jwt")
+        with self.assertRaises(jgi_common.JgiAuthError):
+            jgi_common.check_token(fake_jwt(-10))
+        with self.assertRaises(jgi_common.JgiAuthError):
+            jgi_common.check_token("")
+
+
 class TestBackoff(unittest.TestCase):
     def test_jitter_and_growth(self):
         for attempt, top in [(1, 15), (2, 30), (3, 60), (10, 450)]:
