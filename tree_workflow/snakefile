@@ -202,8 +202,10 @@ rule init_external_busco_lineage_cache:
 rule run_external_busco:
     input:
         genome         = lambda wildcards: EXTERNAL_GENOME_MAP[wildcards.genome_acc],
-        manifest_table = EXTERNAL_PATHS["metadata"]["manifest_table"],
-        lineage_ready  = BUSCO_LINEAGE_READY
+        # ancient(): editing the manifest-table or lineage-cache rules (or their environment)
+        # must not re-run BUSCO on hundreds of genomes; the results do not depend on them
+        manifest_table = ancient(EXTERNAL_PATHS["metadata"]["manifest_table"]),
+        lineage_ready  = ancient(BUSCO_LINEAGE_READY)
     output:
         full_table = EXTERNAL_PATHS["busco"]["full_table"]
     params:
