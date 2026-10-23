@@ -64,7 +64,13 @@ def concatenate(alignment_files, exclude=frozenset(), min_genes_per_genome=1):
         genome: "".join(genomes.get(genome) or "-" * length for _, length, genomes in per_gene)
         for genome in kept
     }
+    partitions, start = [], 1
+    for name, length, genomes in per_gene:
+        partitions.append({"gene": name, "start": start, "end": start + length - 1,
+                           "genomes": len([g for g in genomes if g in sequences])})
+        start += length
     stats = {
+        "partitions": partitions,
         "genes": len(per_gene), "genomes_seen": len(all_genomes), "genomes_kept": len(kept),
         "genomes_dropped_few_genes": len(all_genomes) - len(kept),
         "genes_with_repeated_genomes": repeated_total,
@@ -89,7 +95,12 @@ def main():
         exclude=set(snakemake.params.exclude),
         min_genes_per_genome=int(snakemake.params.min_genes_per_genome),
     )
+    partitions = stats.pop("partitions")
     print("generate_alignment:", stats)
+    with open(snakemake.output.partitions, "w") as handle:
+        handle.write("gene\tstart\tend\tgenomes\n")
+        for row in partitions:
+            handle.write(f"{row['gene']}\t{row['start']}\t{row['end']}\t{row['genomes']}\n")
     if not sequences:
         raise RuntimeError("No genome has enough genes for the concatenated alignment")
     with open(snakemake.output.concatinated_alignment, "w") as handle:

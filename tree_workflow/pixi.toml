@@ -50,9 +50,24 @@ dendropy = "*"
 phylorank = "*"
 polars = "*"
 
+# diagnostics notebook (rule tree_diagnostics): executed with nbconvert
+[feature.diagnostics.dependencies]
+python = "3.12.*"
+jupyter_core = "*"
+nbconvert = "*"
+nbformat = "*"
+ipykernel = "*"
+numpy = "*"
+pandas = "*"
+matplotlib = "*"
+biopython = "*"
+polars = "*"
+scipy = "*"
+
 [environments]
 default  = { solve-group = "all" }
 busco    = { features = ["busco"],    no-default-feature = true }
 eukcc    = { features = ["eukcc"],    no-default-feature = true }
 align    = { features = ["align"],    no-default-feature = true }
 taxonomy = { features = ["taxonomy"], no-default-feature = true }
+diagnostics = { features = ["diagnostics"], no-default-feature = true }

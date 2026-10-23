@@ -78,6 +78,7 @@ BUSCO_LINEAGE_READY = str((ROOT / "output" / "external" / "metadata" / f".busco_
 METAPACKAGE_SINGLEM_INPUT_DIR = Path(METAPACKAGE_CONFIG["singlem_input_dir"])
 METAPACKAGE_VALID_PACKAGES    = Path(METAPACKAGE_CONFIG["valid_packages_manifest"])
 METAPACKAGE_TAXONOMY          = Path(METAPACKAGE_CONFIG["taxonomy_mapping"])
+METAPACKAGE_BUSCO_QC          = Path(METAPACKAGE_CONFIG["busco_qc"])
 
 EXTERNAL_ENABLED  = bool(EXTERNAL_CONFIG.get("enabled", False))
 EXTERNAL_GROUP    = str(EXTERNAL_CONFIG.get("group_name", "external"))
@@ -141,7 +142,7 @@ MERGED_BMGE_TARGETS   = build_merged_bmge_targets_factory(TREE_PATHS, MERGED_GEN
 MERGED_TAXONOMY_INPUT = build_merged_taxonomy_input_factory(EXTERNAL_PATHS, METAPACKAGE_TAXONOMY, USE_EXTERNAL)
 
 
-localrules: build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
+localrules: tree_diagnostics, build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
 
 # The tree is built once per {derep} value:
 #   all    every genome of the metapackage input (+ external genomes)
@@ -167,7 +168,8 @@ def derep_keep_list(wildcards):
 rule all:
     input:
         expand(TREE_PATHS["rerooted_newick"], derep=DEREP_MODES),
-        expand(TAXONOMY_PATHS["metadata"], derep=DEREP_MODES)
+        expand(TAXONOMY_PATHS["metadata"], derep=DEREP_MODES),
+        expand(TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.html", derep=DEREP_MODES)
 
 
 rule build_external_manifest_table:
@@ -478,7 +480,8 @@ rule generate_alignment:
     input:
         alignment_files = MERGED_BMGE_TARGETS
     output:
-        concatinated_alignment = TREE_PATHS["alignment"]
+        concatinated_alignment = TREE_PATHS["alignment"],
+        partitions = TREE_PATHS["partitions"]
     params:
         exclude = sorted(OUTGROUP_EXCLUDE),
         min_genes_per_genome = int(ALIGNMENT_CONFIG.get("min_genes_per_genome", 1))
@@ -488,6 +491,38 @@ rule generate_alignment:
         log_path("generate_alignment", "derep")
     script:
         str(TREE_SCRIPTS / "generate_alignment.py")
+
+
+rule tree_diagnostics:
+    """Executed notebook on the supermatrix (and trees, if built): occupancy, gene overlap and
+    divergence within vs between clades, clade fragmentation, multicopy heuristic check."""
+    input:
+        alignment = TREE_PATHS["alignment"],
+        partitions = TREE_PATHS["partitions"],
+        taxonomy = TAXONOMY_PATHS["conservative"]
+    output:
+        html = TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.html"
+    params:
+        notebook = str(ROOT / "notebooks" / "tree_diagnostics.ipynb"),
+        scripts_dir = str(TREE_SCRIPTS),
+        # read if present when the notebook runs; not rule inputs, so the notebook never waits for the tree
+        trees = lambda wildcards: [TREE_PATHS["rerooted_newick"].format(derep=wildcards.derep)],
+        merged_dir = lambda wildcards: str(Path(MERGED_PATHS["gene_faa"].format(derep=wildcards.derep, gene="x")).parent),
+        busco_manifests = [
+            (str(METAPACKAGE_BUSCO_QC), str(METAPACKAGE_ROOT)),
+            (EXTERNAL_PATHS["metadata"]["busco_qc"], str(ROOT)),
+        ],
+        n_pairs = int(TREE_CONFIG.get("diagnostics_pairs", 2000)),
+        max_multicopy_cases = int(TREE_CONFIG.get("diagnostics_multicopy_cases", 400))
+    threads: 1
+    retries: TOTAL_ATTEMPTS
+    resources: **RESOURCE_PROFILE(mem_scale=2)
+    log:
+        log_path("tree_diagnostics", "derep")
+    conda:
+        env("diagnostics")
+    script:
+        str(TREE_SCRIPTS / "run_diagnostics_notebook.py")
 
 
 rule build_tree:

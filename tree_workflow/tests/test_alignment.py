@@ -60,6 +60,8 @@ class TestAlignment(unittest.TestCase):
         self.assertEqual(seqs["C"], "DDD" + "--" + "--")
         self.assertEqual(stats["genes_with_repeated_genomes"], 1)
         self.assertEqual(stats["columns"], 7)
+        self.assertEqual([(q["gene"], q["start"], q["end"], q["genomes"]) for q in stats["partitions"]],
+                         [("g1", 1, 3, 3), ("g2", 4, 5, 2), ("g3", 6, 7, 2)])
 
     def test_min_genes_and_exclude(self):
         seqs, stats = ga.concatenate([self.g1, self.g2, self.g3], min_genes_per_genome=2)

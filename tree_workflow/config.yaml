@@ -2,12 +2,15 @@ metapackage:
   singlem_input_dir: "../metapackage_workflow/outputs/singlem/input"
   valid_packages_manifest: "../metapackage_workflow/outputs/metadata/qc/valid_singlem_packages.txt"
   taxonomy_mapping: "../metapackage_workflow/outputs/metadata/taxonomy/taxonomy_mapping.tsv"
+  busco_qc: "../metapackage_workflow/outputs/metadata/qc/busco_quality_control_results.tsv"
   # genomes kept for the dereplicated tree (metapackage workflow rule dereplicate_genomes)
   derep_representatives: "../metapackage_workflow/outputs/metadata/qc/dereplicated_genome_representatives.txt"
 
 tree:
   # trees to build: "all" genomes and/or the "derep" representatives
   derep_modes: ["all", "derep"]
+  diagnostics_pairs: 2000           # genome pairs sampled per rank in the diagnostics notebook
+  diagnostics_multicopy_cases: 400  # Duplicated BUSCO genes evaluated
 
 external:
   enabled: true
