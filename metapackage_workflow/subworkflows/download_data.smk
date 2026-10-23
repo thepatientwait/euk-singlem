@@ -146,14 +146,17 @@ checkpoint download_p10k_metadata:
 
 checkpoint discover_ncbi_genomes:
     input:
-        p10k_metadata = METADATA["p10k"]["csv"],
-        fungi_metadata = METADATA["jgi"]["csv"].format(group="fungi"),
-        algae_metadata = METADATA["jgi"]["csv"].format(group="algae"),
+        # ancient(): refreshing JGI statuses (restores) must not re-run NCBI discovery and
+        # everything downstream of it; the JGI/P10K catalogues only rarely change
+        p10k_metadata = ancient(METADATA["p10k"]["csv"]),
+        fungi_metadata = ancient(METADATA["jgi"]["csv"].format(group="fungi")),
+        algae_metadata = ancient(METADATA["jgi"]["csv"].format(group="algae")),
     output:
         metadata = METADATA["ncbi"]["metadata"]
     params:
         tax_id = config["ncbi"]["tax_id"],
         reference_only = config["ncbi"]["reference_only"],
+        include_metazoa_viridiplantae_refs = config["ncbi"].get("include_metazoa_viridiplantae_refs", False),
         email = config["ncbi"]["email"]
     threads: 1
     retries: TOTAL_ATTEMPTS
@@ -203,7 +206,10 @@ rule download_ncbi_genome:
 
 rule download_discovered_ncbi_genome:
     input:
-        metadata = METADATA["ncbi"]["metadata"],
+        # No metadata input: a regenerated ncbi_genomes.tsv must not invalidate
+        # already-downloaded genomes (download_genome.py skips existing outputs).
+        # New accessions still get jobs via the checkpoint-derived target list.
+        # metadata = METADATA["ncbi"]["metadata"],
         # manifest = MANIFEST["unified"]
     output:
         genome = GENOMES["ncbi"]

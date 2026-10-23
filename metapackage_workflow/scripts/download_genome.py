@@ -110,6 +110,14 @@ def main() -> None:
     accession = str(snakemake.wildcards.genome_acc)
     source = str(snakemake.params.source).upper()
     output = Path(snakemake.output.genome)
+
+    # Reuse existing downloads: discovery regeneration must not trigger
+    # re-downloads of genomes already on disk. Zero-byte files are failure
+    # markers from cleanup_failed_genomes and remain eligible for retry.
+    if output.exists() and output.stat().st_size > 0:
+        logger.info("Genome already present, skipping download: %s", output)
+        return
+
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary_output = output.with_suffix(output.suffix + ".partial")
     temporary_output.unlink(missing_ok=True)

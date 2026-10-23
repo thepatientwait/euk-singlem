@@ -35,7 +35,8 @@ busco:
 ncbi:
   email: 'mitcheja@qut.edu.au'
   tax_id: 2759
-  reference_only: true
+  reference_only: false
+  include_metazoa_viridiplantae_refs: true
 
 # SingleM configuration
 singlem:

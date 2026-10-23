@@ -15,8 +15,11 @@ ALGAE_METADATA = str(snakemake.input.algae_metadata)
 TAXON_ID = str(snakemake.params.tax_id)
 EMAIL = snakemake.params.email
 REFERENCE_ONLY = bool(snakemake.params.reference_only)
+INCLUDE_METAZOA_VIRIDIPLANTAE_REFS = bool(
+    getattr(snakemake.params, "include_metazoa_viridiplantae_refs", False))
 OUTPUT = snakemake.output.metadata
 BATCH_SIZE = 200
+SUBCLADE_EXCLUSIONS = " NOT txid33208[Organism:exp] NOT txid3193[Organism:exp]"
 
 
 def chunks(values: list[str], size: int) -> Iterable[list[str]]:
@@ -24,19 +27,12 @@ def chunks(values: list[str], size: int) -> Iterable[list[str]]:
         yield values[start:start + size]
 
 
-def main() -> None:
-    Entrez.email = EMAIL
-    term = f"txid{TAXON_ID}[Organism:exp] AND latest[filter]"
-    term += " NOT txid33208[Organism:exp] "
-    term += " NOT txid3193[Organism:exp]"
-
-    if REFERENCE_ONLY:
-        term += " AND reference[Properties]"
+def search(term: str) -> list[dict]:
     logger.info("Searching NCBI assembly database: %s", term)
     with Entrez.esearch(db="assembly", term=term, retmax=100000, usehistory="y") as handle:
-        search = Entrez.read(handle)
+        search_result = Entrez.read(handle)
 
-    ids = [str(value) for value in search.get("IdList", [])]
+    ids = [str(value) for value in search_result.get("IdList", [])]
     logger.info("Found %d current assemblies", len(ids))
     rows = []
     for batch in chunks(ids, BATCH_SIZE):
@@ -54,6 +50,22 @@ def main() -> None:
                     "download_source": "NCBI",
                     "group": "ncbi",
                 })
+    return rows
+
+
+def main() -> None:
+    Entrez.email = EMAIL
+    base = f"txid{TAXON_ID}[Organism:exp] AND latest[filter]"
+
+    rows = []
+    ref_term = base
+    if not INCLUDE_METAZOA_VIRIDIPLANTAE_REFS:
+        ref_term += SUBCLADE_EXCLUSIONS
+    ref_term += " AND reference[Properties]"
+    rows.extend(search(ref_term))
+
+    if not REFERENCE_ONLY:
+        rows.extend(search(base + SUBCLADE_EXCLUSIONS + " NOT reference[Properties]"))
 
     if not rows:
         raise RuntimeError("NCBI discovery returned no assembly records")
