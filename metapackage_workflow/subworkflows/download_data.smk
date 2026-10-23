@@ -1,5 +1,14 @@
+import os
 import sys
 from pathlib import Path
+
+# Every download job re-parses this file inside a 1-2 GB job. polars (imported by helpers) starts
+# one thread, with its own memory arena, per visible CPU, and some nodes have ~190 of them: a job
+# was OOM-killed at 1 GB before it did anything. Nothing here needs more than one thread. Set before
+# polars is imported; child processes (the download scripts) inherit it.
+os.environ.setdefault("POLARS_MAX_THREADS", "2")
+os.environ.setdefault("RAYON_NUM_THREADS", "2")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 from snakemake_interface_executor_plugins.settings import ExecMode
 
@@ -191,7 +200,7 @@ rule download_jgi_genome:
     resources:
         jgi_api = jgi_api_slots,
         runtime = jgi_runtime,
-        mem_mb = int(BASE_MEM_MB * 0.25)
+        mem_mb = int(BASE_MEM_MB * 0.5)
     wildcard_constraints:
         group = "|".join(GROUPS)
     log:
