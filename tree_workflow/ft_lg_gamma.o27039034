@@ -1,0 +1,39 @@
+
+PBS Job 27039034.aqua
+CPU time         : 01:19:10
+Wall time        : 00:43:49
+Mem usage        : 13032996kb
+
+--- Job Runtime Information at 2026-10-23T17:24:36.359582---
+id               : 27039034.aqua
+Job_Name         : ft_lg_gamma
+Job_Owner        : n9985158@cpu1n001.ib0.hpc.qut.edu.au
+resources_used   : cput=01:19:10,mem=13032996kb,walltime=00:43:49,ncpus=4,cpupercent=237,vmem=15264164kb,cpus="173,177,178,179",ngpus=0
+job_state        : 5
+queue            : cpu_batch_exec
+server           : aqua
+Checkpoint       : u
+Error_Path       : cpu1n001.ib0.hpc.qut.edu.au:/mnt/hpccs01/work/microbiome/msingle/josh/euk-singlem/tree_workflow/ft_lg_gamma.e27039034
+exec_host2       : cpu1n041.ib0.hpc.qut.edu.au:15002/18*4
+exec_vnode       : (cpu1n041[1]:mem=16777216kb:ncpus=4:nfpgas=0:ngpus=0)
+Join_Path        : n
+Keep_Files       : n
+mtime            : 2026-10-23T16:40:48
+Output_Path      : cpu1n001.ib0.hpc.qut.edu.au:/mnt/hpccs01/work/microbiome/msingle/josh/euk-singlem/tree_workflow/ft_lg_gamma.o27039034
+Resource_List    : mem=16gb,walltime=06:00:00,ncpus=4,place=pack
+schedselect      : 1:cpu_id=any:mem=16gb:ncpus=4:nfpgas=0:ngpus=0:qlist=cpu_batch_exec
+stime            : 2026-10-23T16:40:47
+session_id       : 1118431
+substate         : 50
+Variable_List    : PBS_O_HOME=/home/n9985158,PBS_O_LANG=en_US.UTF-8,PBS_O_LOGNAME=n9985158,PBS_O_PATH=/home/n9985158/.pixi/bin:/work/microbiome/sw/zellij:/mnt/hpccs01/work/microbiome/sw/hpc_scripts/bin:/home/n9985158/.pixi/bin:/work/microbiome/sw/zellij:/mnt/hpccs01/work/microbiome/sw/hpc_scripts/bin:/home/n9985158/.pixi/bin:/work/microbiome/sw/zellij:/mnt/hpccs01/work/microbiome/sw/hpc_scripts/bin:/home/n9985158/.pixi/bin:/work/microbiome/sw/zellij:/mnt/hpccs01/work/microbiome/sw/hpc_scripts/bin:/opt/clmgr/sbin:/opt/clmgr/bin:/opt/sgi/sbin:/opt/sgi/bin:/work/microbiome/sw/zellij:/mnt/hpccs01/work/microbiome/sw/hpc_scripts/bin:/home/n9985158/.local/bin:/home/n9985158/bin:/opt/clmgr/sbin:/opt/clmgr/bin:/opt/sgi/sbin:/opt/sgi/bin:/work/microbiome/users/n9985158/e/based/bin:/mnt/weka/pkg/cmr/sw/conda/condabin:/work/microbiome/sw/zellij:/mnt/hpccs01/work/microbiome/sw/hpc_scripts/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/c3/bin:/opt/pbs/bin:/sbin:/bin:/usr/local/bin:/opt/pbs/bin:/sbin:/bin,PBS_O_MAIL=/var/spool/mail/n9985158,PBS_O_SHELL=/bin/bash,PBS_O_TZ=Australia/Brisbane,PBS_O_INTERACTIVE_AUTH_METHOD=resvport,PBS_O_HOST=cpu1n001.ib0.hpc.qut.edu.au,PBS_O_WORKDIR=/mnt/hpccs01/work/microbiome/msingle/josh/euk-singlem/tree_workflow,PBS_O_SYSTEM=Linux,PBS_O_QUEUE=cpu_batch
+euser            : n9985158
+egroup           : default
+hashname         : 27039034.aqua
+run_count        : 1
+job_kill_delay   : 10
+Exit_status      : 0
+project          : DFAZCB7230
+run_version      : 1
+Submit_Host      : cpu1n001.ib0.hpc.qut.edu.au
+Submit_arguments : /tmp/pbs.27036249.aqua/mqsub_scriptk02048al.sh 
+ctime            : 2026-10-23T16:40:26

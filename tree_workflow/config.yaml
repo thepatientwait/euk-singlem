@@ -11,7 +11,7 @@ tree:
   derep_modes: ["all", "derep"]
   fasttree_args: "-lg -gamma"   # protein model; "-nt" (nucleotide) is wrong for this amino-acid alignment
   fasttree_threads: 8
-  fasttree_runtime: "8h"
+  fasttree_runtime: "16h"   # attempts: 16 h, 32 h, 48 h (the 3.7k-taxon test took 44 min on 4 threads; time grows steeply with taxa)
   diagnostics_pairs: 2000           # genome pairs sampled per rank in the diagnostics notebook
   diagnostics_multicopy_cases: 400  # Duplicated BUSCO genes evaluated
 
