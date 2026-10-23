@@ -40,6 +40,7 @@ EUKCC_CONFIG       = config["eukcc"]
 NCBI_CONFIG        = config["ncbi"]
 ALIGNMENT_CONFIG   = config["alignment"]
 TAXONOMY_CONFIG    = config["taxonomy"]
+TREE_CONFIG        = config.get("tree", {})
 RESOURCE_CONFIG    = config["resources"]
 WORKFLOW_PATHS     = config["paths"]
 BASE_MEM_MB        = int(RESOURCE_CONFIG.get("base_mem_mb", 8000))
@@ -142,10 +143,31 @@ MERGED_TAXONOMY_INPUT = build_merged_taxonomy_input_factory(EXTERNAL_PATHS, META
 
 localrules: build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
 
+# The tree is built once per {derep} value:
+#   all    every genome of the metapackage input (+ external genomes)
+#   derep  only the dereplicated representatives (+ external genomes, which are already ANI clusters)
+# The representatives list comes from the metapackage workflow; create it with
+#   (cd ../metapackage_workflow && snakemake -s subworkflows/generate_metapackage.smk \
+#        outputs/metadata/qc/dereplicated_genome_representatives.txt)
+wildcard_constraints:
+    derep = "derep|all"
+
+DEREP_REPRESENTATIVES = Path(METAPACKAGE_CONFIG["derep_representatives"])
+DEREP_MODES = list(TREE_CONFIG.get("derep_modes", ["all", "derep"]))
+if "derep" in DEREP_MODES and not DEREP_REPRESENTATIVES.exists():
+    print(f"WARNING: {DEREP_REPRESENTATIVES} not found; not building the 'derep' tree "
+          "(create it with the metapackage workflow's dereplicate_genomes rule).")
+    DEREP_MODES.remove("derep")
+
+
+def derep_keep_list(wildcards):
+    return str(DEREP_REPRESENTATIVES) if wildcards.derep == "derep" else []
+
+
 rule all:
     input:
-        TREE_PATHS["rerooted_newick"],
-        TAXONOMY_PATHS["metadata"]
+        expand(TREE_PATHS["rerooted_newick"], derep=DEREP_MODES),
+        expand(TAXONOMY_PATHS["metadata"], derep=DEREP_MODES)
 
 
 rule build_external_manifest_table:
@@ -392,6 +414,8 @@ checkpoint aggregate_external_busco_sequences:
 rule merge_gene_fastas:
     input:
         base_faa      = lambda wildcards: str(METAPACKAGE_SINGLEM_INPUT_DIR / f"{wildcards.gene}.faa"),
+        # dereplicated tree: only these genomes are taken from the base input
+        keep          = derep_keep_list,
         # Use a file output (not the directory output) as the checkpoint dependency.
         # The sequences_dir can be pre-created during setup, which would otherwise
         # let Snakemake skip actual aggregation.
@@ -404,7 +428,7 @@ rule merge_gene_fastas:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("merge_gene_fastas", "gene")
+        log_path("merge_gene_fastas", "derep", "gene")
     script:
         str(TREE_SCRIPTS / "merge_gene_fastas.py")
 
@@ -418,7 +442,7 @@ rule famsa:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("famsa", "gene")
+        log_path("famsa", "derep", "gene")
     conda:
         env("align")
     shell:
@@ -440,7 +464,7 @@ rule bmge:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("bmge", "gene")
+        log_path("bmge", "derep", "gene")
     conda:
         env("align")
     shell:
@@ -461,7 +485,7 @@ rule generate_alignment:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("generate_alignment")
+        log_path("generate_alignment", "derep")
     script:
         str(TREE_SCRIPTS / "generate_alignment.py")
 
@@ -474,7 +498,7 @@ rule build_tree:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("build_tree")
+        log_path("build_tree", "derep")
     conda:
         env("align")
     shell:
@@ -492,7 +516,7 @@ if OUTGROUP_ENABLED:
         retries: TOTAL_ATTEMPTS
         resources: **DEFAULT_RESOURCES
         log:
-            log_path("reroot_tree")
+            log_path("reroot_tree", "derep")
         conda:
             env("taxonomy")
         run:
@@ -542,7 +566,7 @@ else:
         retries: TOTAL_ATTEMPTS
         resources: **DEFAULT_RESOURCES
         log:
-            log_path("reroot_tree")
+            log_path("reroot_tree", "derep")
         conda:
             env("taxonomy")
         run:
@@ -608,7 +632,7 @@ rule phylorank_decorate:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("phylorank_decorate")
+        log_path("phylorank_decorate", "derep")
     conda:
         env("taxonomy")
     shell:
@@ -629,11 +653,11 @@ rule phylorank_red:
         red_cutoffs = TAXONOMY_PATHS["red_cutoffs"]
     params:
         command = TAXONOMY_CONFIG["phylorank_command"],
-        red_dir = TAXONOMY_PATHS["red_dir"]
+        red_dir = lambda wildcards: TAXONOMY_PATHS["red_dir"].format(derep=wildcards.derep)
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("phylorank_red")
+        log_path("phylorank_red", "derep")
     conda:
         env("taxonomy")
     shell:
@@ -660,7 +684,7 @@ rule assign_taxonomy:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("assign_taxonomy")
+        log_path("assign_taxonomy", "derep")
     conda:
         env("taxonomy")
     script:
@@ -676,7 +700,7 @@ rule generate_metadata:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("generate_metadata")
+        log_path("generate_metadata", "derep")
     conda:
         env("taxonomy")
     script:

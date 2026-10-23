@@ -2,6 +2,12 @@ metapackage:
   singlem_input_dir: "../metapackage_workflow/outputs/singlem/input"
   valid_packages_manifest: "../metapackage_workflow/outputs/metadata/qc/valid_singlem_packages.txt"
   taxonomy_mapping: "../metapackage_workflow/outputs/metadata/taxonomy/taxonomy_mapping.tsv"
+  # genomes kept for the dereplicated tree (metapackage workflow rule dereplicate_genomes)
+  derep_representatives: "../metapackage_workflow/outputs/metadata/qc/dereplicated_genome_representatives.txt"
+
+tree:
+  # trees to build: "all" genomes and/or the "derep" representatives
+  derep_modes: ["all", "derep"]
 
 external:
   enabled: true

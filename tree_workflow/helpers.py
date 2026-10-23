@@ -165,7 +165,7 @@ def build_merged_genes_factory(valid_genes: list[str], checkpoints, use_external
 
 def build_merged_bmge_targets_factory(tree_paths: dict, merged_genes_func):
     def merged_bmge_targets(wildcards):
-        return [tree_paths["bmge"].format(gene=gene) for gene in merged_genes_func(wildcards)]
+        return [tree_paths["bmge"].format(gene=gene, derep=wildcards.derep) for gene in merged_genes_func(wildcards)]
 
     return merged_bmge_targets
 

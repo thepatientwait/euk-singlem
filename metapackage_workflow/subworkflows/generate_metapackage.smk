@@ -89,13 +89,10 @@ COLLECT_OFF_TARGET_GENOMES = build_off_target_genome_targets_factory(
     gtdb_genomes_database_dir=OFF_TARGET_INPUT.get("gtdb_genomes_database_dir"),
 )
 
-DEREP_ENABLED = config["singlem"]["derep"].get("enabled", True)
-
-
-def BUSCO_MANIFEST_FOR_AGGREGATION(wildcards):
-    if DEREP_ENABLED:
-        return checkpoints.dereplicate_genomes.get().output.filtered_manifest
-    return BUSCO["quality_control_results"]
+# Whether the metapackage itself is built from dereplicated genomes. The dereplication rule
+# below always exists: the tree workflow builds its "derep" tree from the representatives list
+# regardless of this switch (run `snakemake outputs/metadata/qc/dereplicated_genome_representatives.txt`).
+DEREP_ENABLED = bool(config["singlem"]["derep"].get("enabled", False))
 
 
 def COLLECT_GRAFTM_PACKAGES(wildcards):
@@ -255,28 +252,27 @@ rule build_checkm2_quality_report:
         str(SCRIPTS_DIR / "build_checkm2_quality_report.py")
 
 
-if DEREP_ENABLED:
-    checkpoint dereplicate_genomes:
-        """Dereplicate genomes using coverm cluster and emit a filtered BUSCO manifest."""
-        input:
-            quality_report = config["generate"]["quality_report"]["checkm2_style"],
-            busco_manifest = BUSCO["quality_control_results"]
-        output:
-            clusters = config["generate"]["derep"]["cluster_definitions"],
-            representatives = config["generate"]["derep"]["representatives"],
-            filtered_manifest = config["generate"]["derep_manifest"]["busco_filtered"]
-        params:
-            precluster_ani = config["singlem"]["derep"]["precluster_ani"],
-            ani = config["singlem"]["derep"]["ani"]
-        threads: config["resources"]["coverm_cluster_threads"]
-        retries: TOTAL_ATTEMPTS
-        resources: **RESOURCE_PROFILE(mem_scale=50, runtime="4h")
-        log:
-            log_path("dereplicate_genomes")
-        conda:
-            env("coverm")
-        script:
-            str(SCRIPTS_DIR / "dereplicate_genomes.py")
+checkpoint dereplicate_genomes:
+    """Dereplicate genomes using coverm cluster and emit a filtered BUSCO manifest."""
+    input:
+        quality_report = config["generate"]["quality_report"]["checkm2_style"],
+        busco_manifest = BUSCO["quality_control_results"]
+    output:
+        clusters = config["generate"]["derep"]["cluster_definitions"],
+        representatives = config["generate"]["derep"]["representatives"],
+        filtered_manifest = config["generate"]["derep_manifest"]["busco_filtered"]
+    params:
+        precluster_ani = config["singlem"]["derep"]["precluster_ani"],
+        ani = config["singlem"]["derep"]["ani"]
+    threads: config["resources"]["coverm_cluster_threads"]
+    retries: TOTAL_ATTEMPTS
+    resources: **RESOURCE_PROFILE(mem_scale=50, runtime="4h")
+    log:
+        log_path("dereplicate_genomes")
+    conda:
+        env("coverm")
+    script:
+        str(SCRIPTS_DIR / "dereplicate_genomes.py")
 
 
 def BUSCO_MANIFEST_FOR_AGGREGATION(wildcards):
