@@ -168,7 +168,7 @@ MERGED_BMGE_TARGETS   = build_merged_bmge_targets_factory(TREE_PATHS, MERGED_GEN
 MERGED_TAXONOMY_INPUT = build_merged_taxonomy_input_factory(EXTERNAL_PATHS, METAPACKAGE_TAXONOMY, USE_EXTERNAL)
 
 
-localrules: make_subset_list, merge_gene_fastas, tree_diagnostics, build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
+localrules: make_subset_list, merge_gene_fastas, build_external_manifest_table, init_external_busco_lineage_cache, external_busco_results_quality_control, external_build_checkm2_quality_report, build_external_taxid_manifest, rebuild_taxonomy_mapping, aggregate_external_busco_sequences, reroot_tree, prepare_taxonomy, phylorank_decorate, phylorank_red, assign_taxonomy, generate_metadata
 
 # The tree is built once per {derep} x {copy} value:
 #   single Complete BUSCO genes only
@@ -194,6 +194,13 @@ if "derep" in DEREP_MODES and not DEREP_REPRESENTATIVES.exists():
 COPY_MODES = list(TREE_CONFIG.get("copy_modes", ["single", "multi"]))
 
 
+def _abs(path):
+    return str((ROOT / path).resolve())
+
+
+COMPARISON_DIR = ("output" if SUBSET == "none" else SUBSET_DIR) + "/comparison"
+
+
 def derep_keep_list(wildcards):
     return str(DEREP_REPRESENTATIVES) if wildcards.derep == "derep" else []
 
@@ -202,7 +209,9 @@ rule all:
     input:
         expand(TREE_PATHS["rerooted_newick"], derep=DEREP_MODES, copies=COPY_MODES),
         expand(TAXONOMY_PATHS["metadata"], derep=DEREP_MODES, copies=COPY_MODES),
-        expand(TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.html", derep=DEREP_MODES, copies=COPY_MODES)
+        expand(TREE_PATHS["diagnostics_dir"] + "/tree_diagnostics.html", derep=DEREP_MODES, copies=COPY_MODES),
+        expand(TREE_PATHS["diagnostics_dir"] + "/tree_accuracy.html", derep=DEREP_MODES, copies=COPY_MODES),
+        COMPARISON_DIR + "/tree_comparison.html"
 
 
 rule build_external_manifest_table:
@@ -615,6 +624,78 @@ rule tree_diagnostics:
         env("diagnostics")
     script:
         str(TREE_SCRIPTS / "run_diagnostics_notebook.py")
+
+
+# Rooting-independent clade fragmentation, support of the fragmenting splits, misplaced tips and
+# RED statistics of one tree (notebooks/tree_accuracy.ipynb).
+rule tree_accuracy:
+    input:
+        tree = TREE_PATHS["newick"],
+        taxonomy = TAXONOMY_PATHS["conservative"],
+        red_tree = TAXONOMY_PATHS["red_tree"],
+        red_cutoffs = TAXONOMY_PATHS["red_cutoffs"],
+        reference = TAXONOMY_PATHS["reference"]
+    output:
+        html = TREE_PATHS["diagnostics_dir"] + "/tree_accuracy.html"
+    params:
+        notebook = str(ROOT / "notebooks" / "tree_accuracy.ipynb"),
+        nb_params = lambda wildcards, input: {
+            "label": f"{wildcards.derep}/{wildcards.copies}" + ("" if SUBSET == "none" else f" (subset {SUBSET})"),
+            "scripts_dir": _abs(TREE_SCRIPTS),
+            "tree": _abs(input.tree),
+            "taxonomy": _abs(input.taxonomy),
+            "taxonomy_mapping": _abs(METAPACKAGE_TAXONOMY),
+            "red_tree": _abs(input.red_tree),
+            "red_dict": _abs(input.red_cutoffs),
+            "red_tsv": _abs(str(input.red_cutoffs).rsplit(".", 1)[0] + ".tsv"),
+            "busco_manifests": [
+                {"manifest": _abs(METAPACKAGE_BUSCO_QC), "base": _abs(METAPACKAGE_ROOT)},
+                {"manifest": _abs(EXTERNAL_PATHS["metadata"]["busco_qc"]), "base": _abs(ROOT)},
+            ],
+        }
+    threads: 1
+    retries: TOTAL_ATTEMPTS
+    resources: **RESOURCE_PROFILE(mem_scale=2)
+    log:
+        log_path("tree_accuracy", "derep", "copies")
+    conda:
+        env("diagnostics")
+    script:
+        str(TREE_SCRIPTS / "run_notebook.py")
+
+
+# Compares all {derep} x {copies} trees: Robinson-Foulds, fragmentation, single vs multi copy.
+rule tree_comparison:
+    input:
+        trees = expand(TREE_PATHS["newick"], derep=DEREP_MODES, copies=COPY_MODES),
+        alignments = expand(TREE_PATHS["alignment"], derep=DEREP_MODES, copies=COPY_MODES),
+        partitions = expand(TREE_PATHS["partitions"], derep=DEREP_MODES, copies=COPY_MODES),
+        taxonomy = TAXONOMY_PATHS["conservative"]
+    output:
+        html = COMPARISON_DIR + "/tree_comparison.html"
+    params:
+        notebook = str(ROOT / "notebooks" / "tree_comparison.ipynb"),
+        nb_params = lambda wildcards, input: {
+            "scripts_dir": _abs(TREE_SCRIPTS),
+            "taxonomy": _abs(input.taxonomy),
+            "n_pairs": int(TREE_CONFIG.get("diagnostics_pairs", 2000)) // 2,
+            "trees": [
+                {"label": f"{d}/{c}", "derep": d, "copies": c,
+                 "tree": _abs(TREE_PATHS["newick"].format(derep=d, copies=c)),
+                 "alignment": _abs(TREE_PATHS["alignment"].format(derep=d, copies=c)),
+                 "partitions": _abs(TREE_PATHS["partitions"].format(derep=d, copies=c))}
+                for d in DEREP_MODES for c in COPY_MODES
+            ],
+        }
+    threads: 1
+    retries: TOTAL_ATTEMPTS
+    resources: **RESOURCE_PROFILE(mem_scale=4)
+    log:
+        log_path("tree_comparison")
+    conda:
+        env("diagnostics")
+    script:
+        str(TREE_SCRIPTS / "run_notebook.py")
 
 
 rule build_tree:
