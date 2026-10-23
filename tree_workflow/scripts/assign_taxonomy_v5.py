@@ -108,6 +108,24 @@ def read_red_tree(newick_text):
     )
 
 
+def report_negative_branches(tree):
+    """Number and extent of negative branch lengths in the RED tree (printed to the log).
+
+    PhyloRank rewrites branch lengths as differences between median RED values over several
+    rootings, which can be negative where RED is not monotone along a path. The lengths are
+    not divergences; assignment uses the RED value stored on each node, which is unaffected.
+    Returns (count, most_negative).
+    """
+    negative = [e.length for e in tree.preorder_edge_iter() if e.length is not None and e.length < 0]
+    if negative:
+        print(f"NOTE: {len(negative)} branches have negative length in the PhyloRank RED tree "
+              f"(most negative {min(negative):.4f}, total {sum(negative):.4f}). These are artefacts of "
+              "PhyloRank's RED rescaling; RED values themselves are used and are unaffected.")
+    else:
+        print("No negative branch lengths in the RED tree.")
+    return len(negative), (min(negative) if negative else 0.0)
+
+
 def annotate_leaves(tree, known_tax):
     """Set genome_id / is_target / strict (rank -> value) / red on every leaf."""
     leaves = []
@@ -368,6 +386,7 @@ def main():
     known_tax = load_known_taxonomy(str(snakemake.input.taxonomy))
     with open(str(snakemake.input.red_tree)) as handle:
         tree = read_red_tree(handle.read())
+    report_negative_branches(tree)
 
     reference, target, stats = assign_taxonomy(tree, known_tax, red_cutoffs)
 

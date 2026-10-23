@@ -530,8 +530,13 @@ rule build_tree:
         TREE_PATHS["alignment"]
     output:
         TREE_PATHS["newick"]
+    params:
+        # protein alignment: -lg -gamma (the old "-nt" treated amino acids as nucleotides and
+        # ignored ~80% of the residues)
+        args = TREE_CONFIG.get("fasttree_args", "-lg -gamma")
+    threads: int(TREE_CONFIG.get("fasttree_threads", 8))
     retries: TOTAL_ATTEMPTS
-    resources: **DEFAULT_RESOURCES
+    resources: **RESOURCE_PROFILE(runtime=str(TREE_CONFIG.get("fasttree_runtime", "8h")))
     log:
         log_path("build_tree", "derep")
     conda:
@@ -539,7 +544,8 @@ rule build_tree:
     shell:
         """
         exec > {log} 2>&1
-        fasttree -nt {input} > {output}
+        export OMP_NUM_THREADS={threads}
+        FastTreeMP {params.args} {input} > {output}
         """
 
 if OUTGROUP_ENABLED:

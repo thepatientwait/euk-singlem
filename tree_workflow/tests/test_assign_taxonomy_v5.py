@@ -24,6 +24,14 @@ def run(newick, known, cutoffs=CUTOFFS):
     return parsed, {r["genome_id"] for r in tgt}, stats
 
 
+class TestNegativeBranches(unittest.TestCase):
+    def test_counts_negative_edges(self):
+        tree = at.read_red_tree("((a:0.1,b:-0.2)x|RED=0.5:-0.05,c:0.3)root;")
+        self.assertEqual(at.report_negative_branches(tree), (2, -0.2))
+        tree = at.read_red_tree("((a:0.1,b:0.2)x|RED=0.5:0.05,c:0.3)root;")
+        self.assertEqual(at.report_negative_branches(tree), (0, 0.0))
+
+
 class TestParsing(unittest.TestCase):
     def test_parse_and_format_roundtrip(self):
         t = at.parse_tax("d__Eukarya;p__A;c__;o__O;f__;g__G;s__G x")
