@@ -88,18 +88,38 @@ pixi install --all   # once: default (driver) + busco, eukcc, align, taxonomy en
 pixi run snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda -n
 ```
 
-Trees are built once per `{derep}` value (`tree.derep_modes` in `config.yaml`): `all`
-(every genome of the metapackage input plus the external genomes) and `derep` (only the
-representatives listed in `metapackage_workflow/outputs/metadata/qc/dereplicated_genome_representatives.txt`,
-made by the metapackage rule `dereplicate_genomes`; the external genomes are always kept).
-Outputs are under `output/{derep}/`. FastTree runs with the protein model (`tree.fasttree_args`,
-default `-lg -gamma`). The rule `tree_diagnostics` executes `notebooks/tree_diagnostics.ipynb`
-after the alignment (`output/{derep}/diagnostics/tree_diagnostics.html`): gene occupancy,
-gene overlap and sequence divergence within vs between clades, per-gene separation, clade
-fragmentation (`scripts/tree_fragmentation.py` can also compare finished trees) and a check
-of the multicopy top-hit heuristic.
-Negative branch lengths in the PhyloRank RED tree are artefacts of its RED rescaling (counted
-in the `assign_taxonomy` log); RED values themselves are unaffected.
+Trees are built once per `{derep}` x `{copies}` value (`tree.derep_modes`, `tree.copy_modes`
+in `config.yaml`), i.e. up to four trees:
+
+- `{derep}`: `all` (every genome of the metapackage input plus the external genomes) or `derep`
+  (only the representatives in `metapackage_workflow/outputs/metadata/qc/dereplicated_genome_representatives.txt`,
+  made by the metapackage rule `dereplicate_genomes`; external genomes are always kept).
+- `{copies}`: `single` (Complete BUSCO genes only) or `multi` (plus the top-scoring copy of
+  Duplicated genes). Both come from one aggregation: `<gene>_status.tsv` next to each per-gene
+  FASTA says which sequences are Duplicated, and `merge_gene_fastas` filters on it.
+
+Outputs are under `output/{derep}/{copies}/`. FastTree runs with the protein model
+(`tree.fasttree_args`, default `-lg -gamma`). Per tree, after the alignment and the taxonomy:
+
+- `tree_diagnostics` (`notebooks/tree_diagnostics.ipynb`): gene occupancy, gene overlap and
+  divergence within vs between clades, per-gene separation, multicopy top-hit check.
+- `tree_accuracy` (`notebooks/tree_accuracy.ipynb`): rooting-independent clade fragmentation,
+  support of the fragmenting splits, tips that look misplaced (sister-group swaps excluded) versus
+  BUSCO completeness/duplication and taxonomy status, and RED statistics.
+- `tree_comparison` (once, `output/comparison/`): Robinson-Foulds distances between the trees,
+  fragmentation side by side, single- vs multi-copy per-gene separation.
+
+`scripts/tree_fragmentation.py` can also compare finished trees from the command line.
+
+**Quick check on a subset.** `tree.subset` (or `--config subset=family5`) runs the whole workflow
+on a small genome set and writes to `output_subset_<name>/` so the full run is untouched:
+`family5` = 5 random genomes per family (about 2.2k) plus 50 external genomes, `jgi_p10k`,
+`jgi_p10k_family5`. The subset's BUSCO genes are aggregated on their own
+(`aggregate_subset_busco_sequences`), so no full re-aggregation is needed.
+
+PhyloRank's RED is a median over rootings, which makes some branch lengths negative and lets a
+child sit below its parent; `assign_taxonomy` ignores those lengths, raises each node's RED to at
+least its parent's, and logs how many nodes it changed.
 
 Config: `config.yaml` (metapackage inputs, `external` genomes, `outgroup`,
 BUSCO, EukCC, alignment, taxonomy) and `paths.yaml`. Example inputs are
