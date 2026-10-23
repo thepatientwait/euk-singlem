@@ -440,9 +440,11 @@ rule famsa:
         MERGED_PATHS["gene_faa"]
     output:
         TREE_PATHS["famsa"]
-    threads: 2
+    # FAMSA uses every core it sees unless told otherwise, so pass -t: on a shared node an
+    # unbounded run oversubscribes it. ~8k sequences per gene (the "all" tree) take ~1 CPU-hour.
+    threads: 4
     retries: TOTAL_ATTEMPTS
-    resources: **DEFAULT_RESOURCES
+    resources: **RESOURCE_PROFILE(runtime="4h")
     log:
         log_path("famsa", "derep", "gene")
     conda:
@@ -450,7 +452,7 @@ rule famsa:
     shell:
         """
         exec > {log} 2>&1
-        famsa {input} {output}
+        famsa -t {threads} {input} {output}
         """
 
 
