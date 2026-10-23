@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Download one JGI genome that is already on disk at JGI (RESTORED / BACKUP_COMPLETE).
 
-Files that are still PURGED (tape) are NOT waited for: use the jgi_request_restore rule,
-then run again once the restore has finished. A rejected/expired token fails immediately.
+Files that are still on tape (PURGED) or mid-restore (RESTORE_REGISTERED) are NOT waited for:
+use the jgi_request_restore rule, then run again once the restore has finished. A
+rejected/expired token fails immediately.
 """
 import gzip
 import os
@@ -11,6 +12,8 @@ import zipfile
 from pathlib import Path
 
 from jgi_common import (
+    API_TIMEOUT,
+    DOWNLOADABLE_STATUSES,
     JDP_DOWNLOAD_URL,
     JDP_SEARCH_URL,
     JgiAuthError,
@@ -69,7 +72,7 @@ def main():
     session = make_session(token)
 
     response = request_with_retries(
-        session, "GET", JDP_SEARCH_URL, logger, timeout=30,
+        session, "GET", JDP_SEARCH_URL, logger, timeout=API_TIMEOUT,
         params={"organism": genome_acc, "api_version": 2, "a": "false", "h": "false",
                 "d": "asc", "p": 1, "x": 50, "t": "simple"},
     )
@@ -84,10 +87,11 @@ def main():
 
     status = file_obj.get("file_status", "UNKNOWN")
     logger.info("Target file %s status: %s", file_obj["_id"], status)
-    if status == "PURGED":
+    if status not in DOWNLOADABLE_STATUSES:
+        # A download attempt would only answer HTTP 409; fail at once and do not retry
         raise JgiNotRestoredError(
-            f"{genome_acc} is still on tape (PURGED). Run the jgi_request_restore rule and download after "
-            "the restore has completed."
+            f"{genome_acc} is not downloadable yet (status {status}). Run the jgi_request_restore "
+            "rule and download after the restore has completed (up to ~24 h)."
         )
 
     org_key, sub = restore_entry(org, file_obj)

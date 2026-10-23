@@ -24,6 +24,7 @@ requests = "*"
 certifi = "*"
 tqdm = "*"
 ncbi-datasets-cli = "*"   # download_genome.py, fetch_ncbi_taxonomy.py
+pigz = "*"                # download_genome.py: multi-threaded gzip for the Datasets fallback
 [pypi-dependencies]
 jq = "*"                  # helpers.py parses the JGI json with the python jq bindings
 

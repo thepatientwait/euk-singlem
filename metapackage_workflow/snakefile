@@ -75,6 +75,12 @@ def build_common_flags():
         flags.append("--use-conda")
     if RERUN_INCOMPLETE:
         flags.append("--rerun-incomplete")
+    # One exhausted job must not stop the others (a single failed JGI download used to abort
+    # 10k queued jobs and strand the retries of unrelated NCBI jobs).
+    if bool(ORCH_CFG.get("keep_going", True)):
+        flags.append("--keep-going")
+    # Cap on concurrent JGI API users (resource `jgi_api` of download_jgi_genome)
+    flags.append(f"--resources jgi_api={int(config.get('jgi_max_concurrent', 10))}")
     # forward `--config key=value` given on the command line (e.g. pixi_envs_dir=...)
     # so the nested workflows see the same overrides as this one
     cli_config = [
@@ -90,6 +96,10 @@ def build_common_flags():
 
 
 COMMON_FLAGS = build_common_flags()
+
+# Editing a download script must never refetch metadata or re-download genomes (the default
+# "code" trigger would, and then re-run taxonomy for everything downstream).
+DOWNLOAD_FLAGS = "--rerun-triggers mtime input params software-env"
 
 # Run the nested workflows with the same snakemake as this one (the pixi default env),
 # so it works whether or not the caller used `pixi run`.
@@ -118,7 +128,7 @@ rule run_download_subworkflow:
         snakefile = str(DOWNLOAD_SNAKEFILE),
         workdir   = str(ROOT),
         cores     = get_workflow_cores(),
-        flags     = COMMON_FLAGS,
+        flags     = COMMON_FLAGS + " " + DOWNLOAD_FLAGS,
         snakemake = SNAKEMAKE_CMD
     shell:
         """

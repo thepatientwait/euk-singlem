@@ -8,11 +8,17 @@ groups:
 # (e.g. suppressed assemblies); set true to retry those on the next run.
 retry_failed_downloads: false
 
-# JGI genomes on tape (PURGED) cannot be downloaded until JGI restores them.
+# JGI genomes on tape (PURGED) cannot be downloaded until JGI restores them (up to ~24 h).
+# refresh_jgi_metadata: re-fetch the JGI file lists at the start of every real run so restore
+#   statuses are current; a file list is only rewritten (and dependents rerun) if it changed
 # request_jgi_restores: send batched restore requests as part of the download phase
-# jgi_skip_purged: leave genomes that are still on tape out of the DAG (no queue time)
+# jgi_skip_unrestored: leave genomes that are not yet RESTORED / BACKUP_COMPLETE out of the DAG
+#   (no queue time, no HTTP 409 failures)
+# jgi_max_concurrent: JGI download jobs allowed to run at once (the API fails when flooded)
+refresh_jgi_metadata: true
 request_jgi_restores: true
-jgi_skip_purged: true
+jgi_skip_unrestored: true
+jgi_max_concurrent: 10
 
 # JGI API URLs for metadata download
 jgi_config:

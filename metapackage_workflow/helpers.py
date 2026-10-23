@@ -1,3 +1,4 @@
+import collections
 import json
 import logging
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
@@ -8,6 +9,7 @@ from typing import Callable, List, Optional, Tuple
 import jq
 import polars as pl
 
+from scripts.jgi_common import DOWNLOADABLE_STATUSES
 from scripts.utils import CacheManager
 
 
@@ -128,14 +130,18 @@ def create_resource_profile_factory(
         mem_scale: float = 1.0,
         runtime: Optional[str] = None,
         busco: bool = False,
+        fixed_mem: bool = False,
     ) -> dict:
+        """``fixed_mem``: same memory on every attempt (for I/O-bound rules where more memory
+        cannot help a retry)."""
         scaled_mem_mb = max(1, int(base_mem_mb * mem_scale))
         runtime_base = runtime or base_runtime
-        mem_fn = (
-            get_busco_mem_mb(scaled_mem_mb, total_attempts)
-            if busco
-            else get_mem_mb(scaled_mem_mb, total_attempts)
-        )
+        if fixed_mem:
+            mem_fn = scaled_mem_mb
+        elif busco:
+            mem_fn = get_busco_mem_mb(scaled_mem_mb, total_attempts)
+        else:
+            mem_fn = get_mem_mb(scaled_mem_mb, total_attempts)
         return {
             "mem_mb": mem_fn,
             "runtime": get_runtime(runtime_base, total_attempts),
@@ -151,8 +157,17 @@ def get_mem_mb(base_mem_mb: int, total_attempts: int) -> Callable:
     return _get_mem_mb
 
 
+def get_threads(base_threads: int, max_threads: int = 16) -> Callable:
+    """Threads that double on every retry (``base * 2**(attempt-1)``), capped at ``max_threads``."""
+
+    def _get_threads(wildcards, attempt):
+        return min(base_threads * 2 ** (attempt - 1), max_threads)
+
+    return _get_threads
+
+
 def get_runtime(base_runtime: str, total_attempts: int) -> Callable:
-    """Double runtime on each retry, then cap at 1h on final attempt."""
+    """Grow the runtime linearly with the attempt (``base * attempt``)."""
 
     def _get_runtime(wildcards, attempt):
         time = int("".join([char for char in base_runtime if char.isdigit()]))
@@ -179,8 +194,8 @@ def get_busco_mem_mb(base_mem_mb: int, total_attempts: int) -> Callable:
     return _get_busco_mem_mb
 
 
+# No on-disk cache: its key ignores the JSON contents, so a metadata refresh was never seen.
 @lru_cache(maxsize=128)
-@cache_manager.cache_results
 def get_jgi_genome_accs(group: str) -> Tuple[List[str], pl.DataFrame]:
     """Parse JGI data and return list of genome accessions for a group."""
     with open(f"outputs/metadata/source/jgi/{group}.json", "r", encoding="utf-8") as handle:
@@ -329,13 +344,15 @@ def needs_download(path: str, retry_failed: bool = False) -> bool:
     return retry_failed and p.stat().st_size == 0
 
 
-def get_jgi_purged_paths(groups: List[str]) -> set:
-    """Genome paths whose JGI file is still on tape (PURGED) according to the group JSON.
+def get_jgi_not_ready_paths(groups: List[str]) -> dict:
+    """Genome path -> JGI file status for files that cannot be downloaded yet.
 
-    Read straight from the JSON (not the on-disk cache used by get_jgi_genome_accs), so
-    refreshing the metadata is enough to pick up newly RESTORED files.
+    A whitelist: only RESTORED / BACKUP_COMPLETE files (DOWNLOADABLE_STATUSES) are ready.
+    PURGED (tape) and RESTORE_REGISTERED (restore requested, not finished) both answer
+    HTTP 409. Read straight from the JSON (not the cached accession list), so refreshing the
+    metadata is enough to pick up newly restored files.
     """
-    purged = set()
+    not_ready = {}
     for group in groups:
         with open(f"outputs/metadata/source/jgi/{group}.json", "r", encoding="utf-8") as handle:
             organisms = json.load(handle)["organisms"]
@@ -344,9 +361,10 @@ def get_jgi_purged_paths(groups: List[str]) -> set:
             if not files:
                 continue
             biggest = max(files, key=lambda f: int(f.get("file_size") or 0))
-            if biggest.get("file_status") == "PURGED":
-                purged.add(f"outputs/genomes/{group}/{org.get('portal_detail_id')}.fasta.gz")
-    return purged
+            status = biggest.get("file_status")
+            if status not in DOWNLOADABLE_STATUSES:
+                not_ready[f"outputs/genomes/{group}/{org.get('portal_detail_id')}.fasta.gz"] = status
+    return not_ready
 
 
 def build_all_genomes_to_download(
@@ -355,14 +373,14 @@ def build_all_genomes_to_download(
     p10k_checkpoint_getter: Callable,
     ncbi_checkpoint_getter: Callable,
     retry_failed: bool = False,
-    skip_jgi_purged: bool = True,
+    skip_jgi_unrestored: bool = True,
 ) -> Callable:
     """Input function returning only genomes that still need a download job.
 
     Genomes already on disk get no job at all (so no queue time and no rerun-trigger
     re-downloads). The checkpoint getters are still called so the DAG waits for metadata.
-    JGI genomes that are still PURGED (tape) are left out until a metadata refresh shows them
-    as restored.
+    JGI genomes whose file is not yet downloadable (tape / restore pending) are left out until a
+    metadata refresh shows them as restored.
     """
     def _get_all_genomes_to_download(wildcards):
         expected = get_expected_genome_paths(
@@ -375,9 +393,16 @@ def build_all_genomes_to_download(
                 p = Path(path)
                 if p.exists() and p.stat().st_size == 0:
                     p.unlink()
-        # Genomes still on tape cannot be downloaded yet: no job until JGI has restored them
-        purged = get_jgi_purged_paths(groups) if skip_jgi_purged else set()
-        return [path for path in expected if path not in purged and needs_download(path, retry_failed)]
+        # Genomes not yet restored cannot be downloaded: no job until JGI has restored them
+        not_ready = get_jgi_not_ready_paths(groups) if skip_jgi_unrestored else {}
+        todo = [path for path in expected if path not in not_ready and needs_download(path, retry_failed)]
+        waiting = collections.Counter(
+            status for path, status in not_ready.items() if needs_download(path, retry_failed)
+        )
+        if waiting:
+            logging.getLogger(__name__).warning(
+                "JGI genomes waiting for tape restore (no download job): %s", dict(waiting))
+        return todo
 
     return _get_all_genomes_to_download
 

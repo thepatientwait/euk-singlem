@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+from snakemake_interface_executor_plugins.settings import ExecMode
+
 ROOT = Path(workflow.basedir).resolve().parent
 sys.path.insert(0, str(ROOT))
 
@@ -24,6 +26,7 @@ from helpers import (
     get_on_disk_genome_paths,
     get_genome_name,
     get_p10k_genome_url,
+    get_threads,
     log_path,
     redirect_to_log,
     write_genome_manifest_nls,
@@ -46,6 +49,49 @@ TOTAL_ATTEMPTS = config["resources"]["total_attempts"]
 RESOURCE_PROFILE   = create_resource_profile_factory(BASE_MEM_MB, BASE_RUNTIME, TOTAL_ATTEMPTS)
 DEFAULT_RESOURCES  = RESOURCE_PROFILE()
 
+# Refresh the JGI file lists (restore statuses change on JGI's side) before the DAG is built.
+# Only in the main process of a real run: not in dry runs (no side effects) and not when a
+# cluster job re-parses this file. The JSON is replaced only if its content changed, so an
+# unchanged catalogue keeps its mtime and triggers no downloads or reruns.
+def _flag(name, default=True):
+    """Boolean config value; `--config name=false` arrives as the string "false"."""
+    return str(config.get(name, default)).strip().lower() not in ("false", "0", "no", "n", "")
+
+
+class _FormattingLogger:
+    """snakemake's logger does not %-format its arguments."""
+    def __init__(self, base):
+        self._base = base
+    def info(self, msg, *args):
+        self._base.info(msg % args if args else msg)
+    def warning(self, msg, *args):
+        self._base.warning(msg % args if args else msg)
+
+
+if (_flag("refresh_jgi_metadata")
+        and workflow.exec_mode == ExecMode.DEFAULT
+        and not workflow.dryrun
+        and not any(flag in sys.argv for flag in ("-n", "--dry-run", "--dryrun", "--touch", "-t"))):
+    from scripts.refresh_jgi_metadata import refresh_group
+    from snakemake.logging import logger as _smk_logger
+    for _group in GROUPS:
+        refresh_group(_group, GROUP_CONFIG[_group]["json_url"],
+                      METADATA["jgi"]["json"].format(group=_group), _FormattingLogger(_smk_logger))
+
+# Token preflight: a missing/expired JGI token otherwise fails every JGI job separately, after
+# queueing. Real runs stop here; dry runs only warn. Skipped with request_jgi_restores: false
+# (NCBI-only work).
+if workflow.exec_mode == ExecMode.DEFAULT and _flag("request_jgi_restores"):
+    from scripts.jgi_common import JgiAuthError, check_token
+    try:
+        _token_left = check_token(config.get("jgi_token"))
+    except JgiAuthError as _err:
+        if workflow.dryrun or "--dry-run" in sys.argv or "-n" in sys.argv:
+            from snakemake.logging import logger as _smk_logger
+            _smk_logger.warning(f"JGI token check failed (ignored in a dry run): {_err}")
+        else:
+            raise WorkflowError(f"{_err} (set request_jgi_restores: false to skip JGI.)")
+
 ALL_GENOME_DOWNLOAD_TARGETS = build_all_genomes_to_download(
     groups=GROUPS,
     jgi_checkpoint_getter=lambda group: checkpoints.download_jgi_metadata.get(group=group),
@@ -54,7 +100,7 @@ ALL_GENOME_DOWNLOAD_TARGETS = build_all_genomes_to_download(
     # Genomes already on disk (including zero-byte failure markers) get no download job.
     # Set retry_failed_downloads: true in config.yaml to re-request the zero-byte ones.
     retry_failed=bool(config.get("retry_failed_downloads", False)),
-    skip_jgi_purged=bool(config.get("jgi_skip_purged", True)),
+    skip_jgi_unrestored=_flag("jgi_skip_unrestored"),
 )
 
 localrules: download_jgi_metadata, jgi_request_restore, download_p10k_metadata, discover_ncbi_genomes, build_unified_manifest, fetch_ncbi_taxonomy, cleanup_failed_genomes, write_genome_manifest,
@@ -88,13 +134,16 @@ checkpoint download_jgi_metadata:
 rule jgi_request_restore:
     """Ask JGI to restore this group's missing tape (PURGED) genomes; does not wait for them.
 
-    Re-runs whenever the group metadata is refreshed, which re-requests anything still on tape.
+    Re-runs whenever the group metadata changes (it is refreshed at the start of each run), which
+    re-requests anything still on tape. Also reports every missing genome and why it is missing.
     """
     input:
         json = METADATA["jgi"]["json"]
     output:
-        report = METADATA["jgi"]["restore_report"]
+        report = METADATA["jgi"]["restore_report"],
+        not_ready = METADATA["jgi"]["not_ready_report"]
     params:
+        genome_pattern = lambda wildcards: GENOMES["by_group"],
         token = config.get("jgi_token"),
         batch_size = config.get("jgi_restore_batch_size", 50),
         limit = config.get("jgi_restore_limit", 0)
@@ -121,7 +170,12 @@ rule download_jgi_genome:
     # downloads only files already on disk at JGI (no tape wait): small and short; an auth
     # error fails immediately and a transient error gets one retry
     retries: 1
-    resources: **RESOURCE_PROFILE(mem_scale=0.25, runtime="1h")
+    # jgi_api: JGI's API answered HTTP 500/429/timeouts when ~600 jobs hit it at once. The
+    # orchestrator passes --resources jgi_api=<jgi_max_concurrent>; set that when running
+    # this file directly.
+    resources:
+        jgi_api = 1,
+        **RESOURCE_PROFILE(mem_scale=0.25, runtime="1h", fixed_mem=True)
     wildcard_constraints:
         group = "|".join(GROUPS)
     log:
@@ -171,7 +225,8 @@ rule build_unified_manifest:
     """Consolidate NCBI, P10K, and JGI metadata into unified download manifest."""
     input:
         jgi_csvs   = [METADATA["jgi"]["csv"].format(group=group) for group in GROUPS],
-        jgi_jsons  = [METADATA["jgi"]["json"].format(group=group) for group in GROUPS],
+        # ancient(): a restore-status refresh must not rebuild the manifest and re-query NCBI taxonomy
+        jgi_jsons  = [ancient(METADATA["jgi"]["json"].format(group=group)) for group in GROUPS],
         p10k_csv   = METADATA["p10k"]["csv"],
         ncbi_tsv   = METADATA["ncbi"]["metadata"]
     output:
@@ -215,9 +270,11 @@ rule download_discovered_ncbi_genome:
         genome = GENOMES["ncbi"]
     params:
         source = "NCBI"
-    threads: 1
+    # CPUs double on every retry (only used for the NCBI Datasets fallback with pigz); memory
+    # stays fixed because the download is streamed
+    threads: get_threads(1)
     retries: TOTAL_ATTEMPTS
-    resources: **DEFAULT_RESOURCES
+    resources: **RESOURCE_PROFILE(mem_scale=0.5, fixed_mem=True)
     log:
         log_path("download_discovered_ncbi_genome", "genome_acc")
     script:
@@ -302,8 +359,9 @@ rule cleanup_failed_genomes:
         # ask JGI to restore tape genomes (set request_jgi_restores: false to skip, e.g. when
         # only NCBI genomes are wanted and the JGI token is not current)
         restore_requests = (
-            [METADATA["jgi"]["restore_report"].format(group=group) for group in GROUPS]
-            if config.get("request_jgi_restores", True) else []
+            [METADATA["jgi"][key].format(group=group) for group in GROUPS
+             for key in ("restore_report", "not_ready_report")]
+            if _flag("request_jgi_restores") else []
         )
     output:
         report = CLEANUP["report"],

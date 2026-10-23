@@ -10,6 +10,7 @@ download:
       json: "outputs/metadata/source/jgi/{group}.json"
       csv: "outputs/metadata/source/jgi/{group}_meta.csv"
       restore_report: "outputs/metadata/reports/jgi_restore_requested.{group}.tsv"
+      not_ready_report: "outputs/metadata/reports/jgi_not_ready.{group}.tsv"
     p10k:
       csv: "outputs/metadata/source/p10k/p10k_meta.csv"
     taxonomy:
