@@ -513,8 +513,12 @@ rule write_genome_manifest:
                     "regenerate it with the fetch_ncbi_taxonomy rule"
                 )
 
+            # Every genome with a row in the taxonomy mapping goes through BUSCO. "unresolved" ones
+            # (nothing below domain, e.g. p10k "Eukaryota sp.") have no usable label: the metapackage
+            # skips their sequences (aggregate_busco_sequences, tax_status gate) but the tree takes them
+            # as targets, which are named from their neighbours.
             taxonomy_exact = set(
-                taxonomy_df.filter(pl.col("tax_status").is_in(["complete", "partial"]))["acc"].to_list()
+                taxonomy_df.filter(pl.col("tax_status").is_in(["complete", "partial", "unresolved"]))["acc"].to_list()
             )
 
             valid_genome_paths = []
