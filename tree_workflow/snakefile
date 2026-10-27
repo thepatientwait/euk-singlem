@@ -857,7 +857,8 @@ rule phylorank_red:
         red_cutoffs = TAXONOMY_PATHS["red_cutoffs"]
     params:
         command = TAXONOMY_CONFIG["phylorank_command"],
-        red_dir = lambda wildcards: TAXONOMY_PATHS["red_dir"].format(derep=wildcards.derep, copies=wildcards.copies)
+        red_dir = lambda wildcards: TAXONOMY_PATHS["red_dir"].format(derep=wildcards.derep, copies=wildcards.copies),
+        monotone = str(TREE_SCRIPTS / "monotone_red_tree.py")
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
@@ -872,9 +873,14 @@ rule phylorank_red:
         test -s {output.red_tree}
         test -s {output.red_cutoffs}
         """
+        # a stale raw copy would be mistaken for this run's PhyloRank output
+        rm -f {params.red_dir}/*.phylorank_raw.tree
 
 
 rule assign_taxonomy:
+        # PhyloRank's median-over-rootings RED can fall below the parent's (negative branch lengths);
+        # make both RED trees monotone in place (raw PhyloRank trees kept as *.phylorank_raw.tree)
+        python {params.monotone} {output.red_tree} {params.red_dir}/*.scaled.tree
     input:
         red_tree = TAXONOMY_PATHS["red_tree"],
         red_cutoffs = TAXONOMY_PATHS["red_cutoffs"],
