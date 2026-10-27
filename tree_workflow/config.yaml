@@ -77,6 +77,8 @@ alignment:
 
 taxonomy:
   phylorank_command: "phylorank"
+  masking_fraction: 0.15     # label_masking validation: share of reference labels hidden
+  masking_replicates: 5
 
 resources:
   base_mem_mb: 8000

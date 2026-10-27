@@ -615,6 +615,8 @@ def _variants():
          "merged_dir": str(Path(_abs(MERGED_PATHS["gene_faa"].format(derep=d, copies=c, gene="x"))).parent),
          "red_tree": _abs(TAXONOMY_PATHS["red_tree"].format(derep=d, copies=c)),
          "red_dict": _abs(TAXONOMY_PATHS["red_cutoffs"].format(derep=d, copies=c)),
+         "masking": _abs(TAXONOMY_PATHS["label_masking"].format(derep=d, copies=c)),
+         "mixed_nodes": _abs(TAXONOMY_PATHS["mixed_nodes"].format(derep=d, copies=c)),
          "red_tsv": _abs(TAXONOMY_PATHS["red_cutoffs"].format(derep=d, copies=c).rsplit(".", 1)[0] + ".tsv")}
         for d in DEREP_MODES for c in COPY_MODES
     ]
@@ -672,6 +674,8 @@ rule tree_accuracy:
         red_trees = expand(TAXONOMY_PATHS["red_tree"], derep=DEREP_MODES, copies=COPY_MODES),
         red_cutoffs = expand(TAXONOMY_PATHS["red_cutoffs"], derep=DEREP_MODES, copies=COPY_MODES),
         references = expand(TAXONOMY_PATHS["reference"], derep=DEREP_MODES, copies=COPY_MODES),
+        masking = expand(TAXONOMY_PATHS["label_masking"], derep=DEREP_MODES, copies=COPY_MODES),
+        mixed = expand(TAXONOMY_PATHS["mixed_nodes"], derep=DEREP_MODES, copies=COPY_MODES),
         taxonomy = TAXONOMY_PATHS["conservative"]
     output:
         notebook = NOTEBOOK_DIR + "/tree_accuracy.ipynb"
@@ -951,6 +955,28 @@ rule assign_taxonomy:
         env("taxonomy")
     script:
         str(TREE_SCRIPTS / "assign_taxonomy_v5.py")
+
+
+rule label_masking:
+    """Validation: hide a share of the reference labels, re-assign them, and count right / novel / wrong names."""
+    input:
+        red_tree = TAXONOMY_PATHS["red_tree"],
+        red_cutoffs = TAXONOMY_PATHS["red_cutoffs"],
+        taxonomy = TAXONOMY_PATHS["conservative"]
+    output:
+        table = TAXONOMY_PATHS["label_masking"]
+    params:
+        fraction = float(TAXONOMY_CONFIG.get("masking_fraction", 0.15)),
+        replicates = int(TAXONOMY_CONFIG.get("masking_replicates", 5)),
+        seed = 1
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    log:
+        log_path("label_masking", "derep", "copies")
+    conda:
+        env("taxonomy")
+    script:
+        str(TREE_SCRIPTS / "label_masking.py")
 
 
 rule generate_metadata:

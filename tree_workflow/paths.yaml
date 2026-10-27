@@ -40,6 +40,7 @@ paths:
     reference: "output/{derep}/{copies}/taxonomy/taxonomy.revised_reference.tsv"
     target: "output/{derep}/{copies}/taxonomy/target_novelty_taxonomy.tsv"
     mixed_nodes: "output/{derep}/{copies}/taxonomy/mixed_nodes.tsv"
+    label_masking: "output/{derep}/{copies}/taxonomy/label_masking.tsv"
     split_map: "output/taxonomy/clade_split_map.tsv"
     combine_map: "output/taxonomy/clade_combine_map.tsv"
     partial_map: "output/taxonomy/partial_taxonomy_recovery_map.tsv"
