@@ -882,6 +882,7 @@ rule assign_taxonomy:
     output:
         reference_taxonomy = TAXONOMY_PATHS["reference"],
         target_taxonomy = TAXONOMY_PATHS["target"],
+        mixed_nodes = TAXONOMY_PATHS["mixed_nodes"],
         # split_map = TAXONOMY_PATHS["split_map"],
         # combine_map = TAXONOMY_PATHS["combine_map"],
         # partial_map = TAXONOMY_PATHS["partial_map"]

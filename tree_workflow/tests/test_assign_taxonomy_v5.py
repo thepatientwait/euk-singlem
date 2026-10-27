@@ -102,6 +102,54 @@ class TestConflictPropagation(unittest.TestCase):
         self.assertEqual(parsed["X"]["species"], "G1 sp_1")
 
 
+class TestMixedNodeNaming(unittest.TestCase):
+    """Decision 1B: a MIXED node above the cutoff of the rank it is mixed at takes the majority name."""
+
+    KNOWN = {
+        "m1": full("Muc", "C1", "O1", "F1", "G1", "G1 a"),
+        "m2": full("Muc", "C1", "O1", "F1", "G1", "G1 a"),
+        "m3": full("Muc", "C1", "O1", "F1", "G1", "G1 a"),
+        "z1": full("Mort", "C2", "O2", "F2", "G2", "G2 a"),
+    }
+
+    def test_target_in_young_mixed_clade_gets_majority_not_placeholder(self):
+        # clade RED 0.55 is above the phylum cutoff (0.5) but the labels disagree at phylum
+        nwk = "(((m1|RED=1:0.1,m2|RED=1:0.1)|RED=0.97:0.1,m3|RED=1:0.1)|RED=0.96:0.1,(z1|RED=1:0.1,t|RED=1:0.1)|RED=0.98:0.1)|RED=0.55;"
+        parsed, targets, stats = run(nwk, self.KNOWN)
+        self.assertEqual(targets, {"t"})
+        # sister of z1 sits in the pure-Mort clade, so it is Mort, not a placeholder phylum
+        self.assertEqual(parsed["t"]["phylum"], "Mort")
+        self.assertFalse(any("Eukarya_p" in v for v in parsed["t"].values()))
+        ranks = {n["rank"]: n for n in stats["mixed_nodes"]}
+        self.assertEqual(ranks["phylum"]["majority"], "Muc")
+        self.assertEqual(ranks["phylum"]["majority_count"], 3)
+        self.assertIn("Mort:1", ranks["phylum"]["others"])
+
+    def test_target_directly_under_mixed_node_takes_majority(self):
+        nwk = "((m1|RED=1:0.1,m2|RED=1:0.1,m3|RED=1:0.1)|RED=0.99:0.1,z1|RED=1:0.1,t|RED=1:0.1)|RED=0.55;"
+        parsed, _, stats = run(nwk, self.KNOWN)
+        self.assertEqual(parsed["t"]["phylum"], "Muc")
+        self.assertEqual(len(stats["mixed_nodes"]), 1)
+
+    def test_reference_labels_unchanged(self):
+        nwk = "((m1|RED=1:0.1,m2|RED=1:0.1,m3|RED=1:0.1)|RED=0.99:0.1,z1|RED=1:0.1,t|RED=1:0.1)|RED=0.55;"
+        parsed, _, _ = run(nwk, self.KNOWN)
+        self.assertEqual(parsed["z1"]["phylum"], "Mort")
+        self.assertEqual(parsed["m1"]["phylum"], "Muc")
+
+    def test_old_mixed_node_still_gets_placeholders(self):
+        # RED 0.3 is below the phylum cutoff: the clade may contain several phyla, so no majority naming
+        nwk = "((m1|RED=1:0.1,m2|RED=1:0.1,m3|RED=1:0.1)|RED=0.99:0.1,z1|RED=1:0.1,t|RED=1:0.1)|RED=0.3;"
+        parsed, _, stats = run(nwk, self.KNOWN)
+        self.assertNotIn(parsed["t"]["phylum"], {"Muc", "Mort"})
+        self.assertEqual(stats["mixed_nodes"], [])
+
+    def test_tie_is_alphabetical(self):
+        known = {"a": full("Zed", "C", "O", "F", "G", "G a"), "b": full("Alpha", "C", "O", "F", "G", "G b")}
+        parsed, _, stats = run("(a|RED=1:0.1,b|RED=1:0.1,t|RED=1:0.1)|RED=0.55;", known)
+        self.assertEqual(parsed["t"]["phylum"], "Alpha")
+
+
 class TestInheritanceLeak(unittest.TestCase):
     def test_changed_rank_clears_lower_inherited_ranks(self):
         """Bug 3: a leaf with its own phylum must not keep the parent's class."""

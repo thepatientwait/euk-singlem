@@ -191,18 +191,39 @@ def annotate_internal_nodes(tree):
     A rank is absent from ``state`` when no reference leaf below has a value
     (no information, distinct from MIXED). MIXED is sticky and, as soon as it
     occurs, lower ranks are left unset.
+
+    A node whose state is MIXED at some rank also gets ``node.mixed``: a dict with the
+    rank, the majority name there (ties: alphabetical), its count, the number of
+    reference leaves with a value at that rank and a summary of the other names.
+    Per-rank name counts are merged up the tree (small into large), so this is cheap.
     """
     for node in tree.postorder_node_iter():
+        node.mixed = None
         if node.is_leaf():
             node.state = dict(node.strict)
+            node._counts = {rank: Counter([value]) for rank, value in node.strict.items()}
+            node._size = 1
             continue
 
         _, node.red = parse_node_label(node)
 
+        children = list(node.child_node_iter())
+        biggest = max(children, key=lambda c: c._size)
+        counts = biggest._counts
+        for child in children:
+            if child is biggest:
+                continue
+            for rank, counter in child._counts.items():
+                counts.setdefault(rank, Counter()).update(counter)
+        node._counts = counts
+        node._size = sum(c._size for c in children)
+        for child in children:
+            del child._counts  # the largest child's counters now belong to this node
+
         state = {}
         for rank in RANKS:
             merged = None
-            for child in node.child_node_iter():
+            for child in children:
                 value = child.state.get(rank)
                 if value is None:
                     continue
@@ -215,6 +236,16 @@ def annotate_internal_nodes(tree):
                 continue
             state[rank] = merged
             if merged is MIXED:
+                counter = counts[rank]
+                ordered = sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))
+                node.mixed = {
+                    "rank": rank,
+                    "majority": ordered[0][0],
+                    "majority_count": ordered[0][1],
+                    "n_reference": sum(counter.values()),
+                    "others": ";".join(f"{name}:{n}" for name, n in ordered[1:6])
+                              + (f";+{len(ordered) - 6} more" if len(ordered) > 6 else ""),
+                }
                 break
         node.state = state
 
@@ -315,14 +346,39 @@ def resolve_name(value, counters, used_names):
     return value.name
 
 
+def resolve_mixed(node, assigned, red_cutoffs):
+    """Name a MIXED node by the majority of its reference leaves when it is too shallow to be
+    several taxa at the rank it is mixed at (RED above that rank's cutoff).
+
+    Returns the report row, or None when nothing was applied. A changed rank invalidates the
+    lower inherited ranks, as in apply_state.
+    """
+    info = node.mixed
+    if info is None or node.red is None:
+        return None
+    rank = info["rank"]
+    cutoff = red_cutoffs.get(rank)
+    if cutoff is None or node.red <= cutoff:
+        return None
+    if assigned.get(rank) != info["majority"]:
+        assigned[rank] = info["majority"]
+        for lower in RANKS[RANKS.index(rank) + 1:]:
+            assigned.pop(lower, None)
+    return {"red": node.red, **info}
+
+
 def assign_top_down(tree, red_cutoffs, used_names):
     counters = defaultdict(int)
     reference, target = [], []
+    mixed_nodes = []
 
     for node in tree.preorder_node_iter():
         parent = node.parent_node
         assigned = dict(parent.assigned) if parent is not None else {}
         apply_state(assigned, node.state)
+        row = resolve_mixed(node, assigned, red_cutoffs)
+        if row is not None:
+            mixed_nodes.append(row)
         if parent is None:
             assigned.setdefault("domain", DEFAULT_DOMAIN)
         truncate_by_red(assigned, node.red, red_cutoffs)
@@ -339,10 +395,10 @@ def assign_top_down(tree, red_cutoffs, used_names):
         node.assigned = assigned
         if is_leaf:
             names = {rank: resolve_name(assigned[rank], counters, used_names) for rank in RANKS if rank in assigned}
-            row = {"genome_id": node.genome_id, "taxonomy": format_tax(names)}
-            (target if node.is_target else reference).append(row)
+            leaf_row = {"genome_id": node.genome_id, "taxonomy": format_tax(names)}
+            (target if node.is_target else reference).append(leaf_row)
 
-    return reference, target
+    return reference, target, mixed_nodes
 
 
 # --------------------------------------------------------------------------
@@ -360,13 +416,14 @@ def assign_taxonomy(tree, known_tax, red_cutoffs):
         for rank, value in leaf.strict.items():
             used_names[rank].add(value)
 
-    reference, target = assign_top_down(tree, red_cutoffs, used_names)
+    reference, target, mixed_nodes = assign_top_down(tree, red_cutoffs, used_names)
     stats = {
         "leaves": len(leaves),
         "reference": len(reference),
         "target": len(target),
         "harmonised_changes": changes,
         "red_raised_to_parent": red_raised,
+        "mixed_nodes": mixed_nodes,
         "internal_nodes_without_red": sum(
             1 for n in tree.internal_nodes() if n.red is None
         ),
@@ -400,6 +457,14 @@ def load_known_taxonomy(path):
     return known
 
 
+def write_mixed_nodes(rows, path):
+    columns = ["rank", "majority", "majority_count", "n_reference", "others", "red"]
+    frame = pl.DataFrame({c: [r[c] for r in rows] for c in columns},
+                         schema={"rank": pl.Utf8, "majority": pl.Utf8, "majority_count": pl.Int64,
+                                 "n_reference": pl.Int64, "others": pl.Utf8, "red": pl.Float64})
+    frame.sort(["rank", "n_reference"], descending=[False, True]).write_csv(path, separator="\t")
+
+
 def write_rows(rows, path):
     schema = {"genome_id": pl.Utf8, "taxonomy": pl.Utf8}
     pl.DataFrame(rows, schema=schema).write_csv(path, separator="\t")
@@ -424,6 +489,12 @@ def main():
         print(f"NOTE: RED raised to the parent's value on {stats['red_raised_to_parent']} nodes (non-monotone RED).")
     if stats["internal_nodes_without_red"]:
         print(f"WARNING: {stats['internal_nodes_without_red']} internal nodes have no RED value.")
+
+    mixed = stats["mixed_nodes"]
+    write_mixed_nodes(mixed, str(snakemake.output.mixed_nodes))
+    by_rank = Counter(r["rank"] for r in mixed)
+    print(f"{len(mixed)} MIXED nodes were named by their majority label instead of a new placeholder "
+          f"(by rank: {dict(by_rank)}); see {snakemake.output.mixed_nodes}.")
 
     write_rows(target, str(snakemake.output.target_taxonomy))
     print(f"Wrote {len(target)} target genomes.")
