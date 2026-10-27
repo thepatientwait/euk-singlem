@@ -18,8 +18,15 @@ This script fixes that in place, for ``*.red_decorated.tree`` (``|RED=`` labels)
 The untouched PhyloRank file is kept next to the result as ``<name>.phylorank_raw<suffix>`` (created
 once; a later call starts from it again, so the script is idempotent) for diagnostics.
 
-    monotone_red_tree.py TREE [TREE ...]
+    monotone_red_tree.py [--cutoffs DICT] TREE [TREE ...]
+
+PhyloRank's rank cutoffs (``--cutoffs``, the ``.dict`` file) are medians of the RED of the named taxa. They
+stay valid as long as no taxon's node was raised. Raised nodes are deep (near the root), so the script checks
+that every raised node ends at least ``CUTOFF_MARGIN`` below the lowest cutoff; if not, it fails, because
+the cutoffs would have to be re-derived from the monotone values.
 """
+import argparse
+import json
 import re
 import shutil
 import sys
@@ -60,7 +67,7 @@ def make_monotone(tree):
     branches before; ``max_raise``: largest increase of a node's RED; ``negative_after``: should be 0.
     """
     stats = {"nodes": 0, "negative_before": 0, "most_negative_before": 0.0, "raised": 0,
-             "max_raise": 0.0, "negative_after": 0}
+             "max_raise": 0.0, "negative_after": 0, "max_raised_red": 0.0}
     for node in tree.preorder_node_iter():
         parent = node.parent_node
         if parent is None:
@@ -76,6 +83,7 @@ def make_monotone(tree):
         if node.red_fixed > node.red_raw + EPS:
             stats["raised"] += 1
             stats["max_raise"] = max(stats["max_raise"], node.red_fixed - node.red_raw)
+            stats["max_raised_red"] = max(stats["max_raised_red"], node.red_fixed)
     for node in tree.preorder_node_iter():
         stats["nodes"] += 1
         parent = node.parent_node
@@ -107,16 +115,41 @@ def fix_file(path):
     return stats
 
 
-def main(paths):
+CUTOFF_MARGIN = 0.05
+
+
+def check_cutoffs(stats, cutoffs_path):
+    """Raise if a raised node came close to the lowest rank cutoff (the cutoffs could be stale)."""
+    if not cutoffs_path or not stats["raised"]:
+        return None
+    cutoffs = [v for v in json.loads(Path(cutoffs_path).read_text()).values() if v is not None]
+    if not cutoffs:
+        return None
+    lowest = min(cutoffs)
+    if stats["max_raised_red"] > lowest - CUTOFF_MARGIN:
+        raise SystemExit(
+            f"a raised node ends at RED {stats['max_raised_red']:.3f}, within {CUTOFF_MARGIN} of the lowest rank cutoff "
+            f"{lowest:.3f}: the cutoffs in {cutoffs_path} may be stale; re-derive them from the monotone tree")
+    return lowest
+
+
+def main(paths, cutoffs=None):
     for path in paths:
         stats = fix_file(path)
+        lowest = check_cutoffs(stats, cutoffs)
+        extra = (f"; raised nodes end at RED <= {stats['max_raised_red']:.3f}, lowest rank cutoff {lowest:.3f}: cutoffs unaffected"
+                 if lowest is not None else "")
         print(f"{path}: {stats['negative_before']} negative branches "
               f"(most negative {stats['most_negative_before']:.4f}) before; "
               f"{stats['raised']} nodes raised to their parent's RED (largest raise {stats['max_raise']:.4f}); "
-              f"{stats['negative_after']} negative after. Raw PhyloRank tree: {raw_path(path)}", flush=True)
+              f"{stats['negative_after']} negative after{extra}. Raw PhyloRank tree: {raw_path(path)}", flush=True)
         if stats["negative_after"]:
             raise SystemExit(f"{path}: negative branches remain")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--cutoffs", help="PhyloRank rank-cutoff .dict file to check against")
+    parser.add_argument("trees", nargs="+")
+    args = parser.parse_args()
+    main(args.trees, args.cutoffs)

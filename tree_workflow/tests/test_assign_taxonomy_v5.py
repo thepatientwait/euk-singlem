@@ -269,3 +269,44 @@ class TestDeterminism(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReferenceLabelsKept(unittest.TestCase):
+    def test_check_raises_when_a_name_changes(self):
+        tree = at.read_red_tree("(a|RED=1:0.1,b|RED=1:0.1)|RED=0.3;")
+        known = {"a": full("P1", "C1", "O1", "F1", "G1", "G1 a"), "b": full("P1", "C1", "O1", "F1", "G1", "G1 b")}
+        leaves = at.annotate_leaves(tree, known)
+        good = [{"genome_id": "a", "taxonomy": known["a"]}, {"genome_id": "b", "taxonomy": known["b"]}]
+        self.assertEqual(at.check_reference_labels_kept(leaves, good), 0)
+        bad = [{"genome_id": "a", "taxonomy": full("P2", "C1", "O1", "F1", "G1", "G1 a")}, good[1]]
+        with self.assertRaises(ValueError):
+            at.check_reference_labels_kept(leaves, bad)
+
+    def test_blank_ranks_may_be_filled(self):
+        known = {"a": full("P1", "C1"), "b": full("P1", "C1", "O1", "F1", "G1", "G1 b")}
+        parsed, _, stats = run("(a|RED=1:0.1,b|RED=1:0.1)|RED=0.3;", known)
+        self.assertGreater(stats["reference_blank_ranks_filled"], 0)
+        self.assertEqual(parsed["a"]["phylum"], "P1")
+
+    def test_mixed_majority_naming_never_changes_reference_names(self):
+        known = {"m1": full("Muc", "C1", "O1", "F1", "G1", "G1 a"), "m2": full("Muc", "C1", "O1", "F1", "G1", "G1 a"),
+                 "z1": full("Mort", "C2", "O2", "F2", "G2", "G2 a")}
+        parsed, _, stats = run("((m1|RED=1:0.1,m2|RED=1:0.1)|RED=0.99:0.1,z1|RED=1:0.1,t|RED=1:0.1)|RED=0.55;", known)
+        self.assertEqual((parsed["z1"]["phylum"], parsed["m1"]["phylum"]), ("Mort", "Muc"))
+        self.assertEqual(len(stats["mixed_nodes"]), 1)
+
+
+class TestMonotoneInputUnchanged(unittest.TestCase):
+    NWK = "(((a|RED=1:0.1,b|RED=1:0.1)|RED=0.9:0.1,t|RED=1:0.1)|RED=0.6:0.1,u|RED=1:0.1)|RED=0.2;"
+    KNOWN = {"a": full("P1", "C1", "O1", "F1", "G1", "G1 a"), "b": full("P1", "C1", "O1", "F1", "G2", "G2 b")}
+
+    def test_guard_is_a_noop_on_a_monotone_tree(self):
+        tree = at.read_red_tree(self.NWK)
+        at.annotate_leaves(tree, self.KNOWN)
+        at.annotate_internal_nodes(tree)
+        self.assertEqual(at.enforce_monotone_red(tree), 0)
+        self.assertEqual(run(self.NWK, self.KNOWN)[2]["red_raised_to_parent"], 0)
+
+    def test_guard_fires_on_a_non_monotone_tree_and_changes_output_only_there(self):
+        bad = self.NWK.replace("RED=0.9:0.1,t", "RED=0.3:0.1,t")     # child 0.3 below its parent 0.6
+        self.assertEqual(run(bad, self.KNOWN)[2]["red_raised_to_parent"], 1)

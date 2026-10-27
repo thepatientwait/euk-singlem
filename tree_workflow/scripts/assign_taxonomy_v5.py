@@ -404,6 +404,27 @@ def assign_top_down(tree, red_cutoffs, used_names):
 # --------------------------------------------------------------------------
 # Orchestration / IO
 # --------------------------------------------------------------------------
+def check_reference_labels_kept(leaves, reference_rows):
+    """Every reference genome keeps each database name it had (after harmonising higher ranks).
+
+    Only blank ranks may be filled (with a majority name or a placeholder). If a named rank changed, a
+    database name would have been merged into another or split, which this method must never do.
+    Returns the number of blank ranks that were filled; raises ValueError on any changed name.
+    """
+    expected = {leaf.genome_id: leaf.strict for leaf in leaves if not leaf.is_target}
+    changed, filled = [], 0
+    for row in reference_rows:
+        got = parse_tax(row["taxonomy"])
+        for rank, name in expected[row["genome_id"]].items():
+            if got.get(rank) != name:
+                changed.append((row["genome_id"], rank, name, got.get(rank)))
+        filled += sum(1 for rank in RANKS[1:] if rank not in expected[row["genome_id"]] and got.get(rank))
+    if changed:
+        raise ValueError(f"{len(changed)} reference database names were changed by the assignment "
+                         f"(genome, rank, before, after), e.g. {changed[:5]}")
+    return filled
+
+
 def assign_taxonomy(tree, known_tax, red_cutoffs):
     """Run the full method on a dendropy tree. Returns (reference_rows, target_rows, stats)."""
     leaves = annotate_leaves(tree, known_tax)
@@ -417,7 +438,9 @@ def assign_taxonomy(tree, known_tax, red_cutoffs):
             used_names[rank].add(value)
 
     reference, target, mixed_nodes = assign_top_down(tree, red_cutoffs, used_names)
+    filled = check_reference_labels_kept(leaves, reference)
     stats = {
+        "reference_blank_ranks_filled": filled,
         "leaves": len(leaves),
         "reference": len(reference),
         "target": len(target),
@@ -486,10 +509,12 @@ def main():
     if stats["harmonised_changes"]:
         print(f"Harmonised higher-rank labels (leaf labels changed, by rank): {stats['harmonised_changes']}")
     if stats["red_raised_to_parent"]:
-        print(f"NOTE: RED raised to the parent's value on {stats['red_raised_to_parent']} nodes (non-monotone RED).")
+        print(f"WARNING: RED raised to the parent's value on {stats['red_raised_to_parent']} nodes: the RED tree was not "
+              "made monotone (monotone_red_tree.py in rule phylorank_red did not run on this tree).")
     if stats["internal_nodes_without_red"]:
         print(f"WARNING: {stats['internal_nodes_without_red']} internal nodes have no RED value.")
 
+    print(f"Reference check passed: no database name changed ({stats['reference_blank_ranks_filled']} blank ranks filled).")
     mixed = stats["mixed_nodes"]
     write_mixed_nodes(mixed, str(snakemake.output.mixed_nodes))
     by_rank = Counter(r["rank"] for r in mixed)

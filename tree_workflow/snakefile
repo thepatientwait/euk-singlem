@@ -924,7 +924,7 @@ rule phylorank_red:
         test -s {output.red_cutoffs}
         # PhyloRank's median-over-rootings RED can fall below the parent's (negative branch lengths);
         # make both RED trees monotone in place (raw PhyloRank trees kept as *.phylorank_raw.tree)
-        python {params.monotone} {output.red_tree} {params.red_dir}/*.scaled.tree
+        python {params.monotone} --cutoffs {output.red_cutoffs} {output.red_tree} {params.red_dir}/*.scaled.tree
         """
 
 

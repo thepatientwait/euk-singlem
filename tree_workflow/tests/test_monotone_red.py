@@ -72,3 +72,25 @@ class TestMonotone(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCutoffCheck(unittest.TestCase):
+    def _cut(self, tmp, low):
+        p = Path(tmp) / "c.dict"
+        p.write_text('{"phylum": %s, "class": 0.8}' % low)
+        return p
+
+    def test_passes_when_raised_nodes_are_far_below_cutoffs(self):
+        _, stats = run(BAD)           # raised node ends at 0.5 of RED scale
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(mr.check_cutoffs(stats, self._cut(tmp, 0.9)), 0.8)
+
+    def test_fails_when_a_raised_node_reaches_the_cutoffs(self):
+        _, stats = run(BAD)
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit):
+                mr.check_cutoffs(stats, self._cut(tmp, 0.52))
+
+    def test_nothing_raised_nothing_checked(self):
+        _, stats = run(GOOD)
+        self.assertIsNone(mr.check_cutoffs(stats, "/nonexistent"))
