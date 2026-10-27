@@ -646,7 +646,6 @@ rule tree_diagnostics:
             "variants": _variants(),
             "busco_manifests": _busco_manifests(),
             "n_pairs": int(TREE_CONFIG.get("diagnostics_pairs", 2000)),
-            "max_multicopy_cases": int(TREE_CONFIG.get("diagnostics_multicopy_cases", 400)),
             "out_dir": _abs(NOTEBOOK_DIR + "/tables/tree_diagnostics"),
         }
     threads: 1
