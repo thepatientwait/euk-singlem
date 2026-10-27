@@ -18,12 +18,19 @@ logger = configure_logger(__file__)
 
 
 
-def parse_busco_file(busco_file: Path, use_multi_copy: bool) -> Tuple[str, str, pl.DataFrame]:
+MAX_CANDIDATE_COPIES = 6  # candidate copies kept per Duplicated gene when copies are chosen by peer similarity
+
+
+def parse_busco_file(busco_file: Path, use_multi_copy: bool,
+                     keep_all_copies: bool = False) -> Tuple[str, str, pl.DataFrame]:
     """
     Parse a BUSCO results file and extract group, genome_acc, and complete genes.
     
     Args:
         busco_file: Path to BUSCO full_table.tsv file
+        use_multi_copy: also include Duplicated genes
+        keep_all_copies: keep up to MAX_CANDIDATE_COPIES copies of each Duplicated gene (best score
+            first) instead of only the top one, so the aggregation can choose among them
         
     Returns:
         Tuple of (group, genome_acc, complete_genes_dataframe)
@@ -66,6 +73,13 @@ def parse_busco_file(busco_file: Path, use_multi_copy: bool) -> Tuple[str, str, 
               descending=[False, True] + ([True] if 'Length' in busco_df.columns else []) + [False, False],
               nulls_last=True)
         .unique(subset=['Busco id'], keep='first', maintain_order=True)
+    if keep_all_copies:
+        # copies of a gene arrive best-first; keep the first few of each
+        selected_genes = selected_genes.filter(
+            pl.int_range(pl.len()).over('Busco id') < MAX_CANDIDATE_COPIES
+        )
+    else:
+        selected_genes = selected_genes.unique(subset=['Busco id'], keep='first', maintain_order=True)
     )
 
     logger.info(f"Selected {len(selected_genes)} BUSCO genes (top hit each) for {group}/{genome_acc}")
@@ -175,7 +189,8 @@ def calculate_sequence_length(sequence: str) -> int:
 
 
 
-def process_single_busco_file(busco_file_str: str, use_multi_copy: bool) -> Tuple[Dict[str, Dict], Optional[str]]:
+def process_single_busco_file(busco_file_str: str, use_multi_copy: bool,
+                              keep_all_copies: bool = False) -> Tuple[Dict[str, Dict], Optional[str]]:
     """
     Process a single BUSCO file and return results.
     
@@ -195,7 +210,7 @@ def process_single_busco_file(busco_file_str: str, use_multi_copy: bool) -> Tupl
     
     try:
         # Parse BUSCO results
-        group, genome_acc, selected_genes = parse_busco_file(busco_file, use_multi_copy)
+        group, genome_acc, selected_genes = parse_busco_file(busco_file, use_multi_copy, keep_all_copies)
         
         # Extract gene sequences
         gene_data = extract_gene_sequences(busco_file, selected_genes, group, genome_acc)
@@ -239,7 +254,8 @@ def merge_gene_sequences(results: List[Tuple[Dict[str, Dict], Optional[str]]]) -
 
 
 
-def process_all_busco_results(busco_files: List[str], use_multi_copy: bool) -> Dict[str, Dict]:
+def process_all_busco_results(busco_files: List[str], use_multi_copy: bool,
+                              keep_all_copies: bool = False) -> Dict[str, Dict]:
     """
     Process all BUSCO result files and extract gene sequences using multiprocessing.
     
@@ -258,7 +274,7 @@ def process_all_busco_results(busco_files: List[str], use_multi_copy: bool) -> D
     # Process files in parallel
     logger.info("Starting parallel processing of BUSCO files...")
     results = Parallel(n_jobs=n_jobs, prefer="threads", verbose=1)(
-        delayed(process_single_busco_file)(busco_file, use_multi_copy) 
+        delayed(process_single_busco_file)(busco_file, use_multi_copy, keep_all_copies)
         for busco_file in busco_files
     )
     
@@ -666,6 +682,12 @@ def main():
         raise ValueError(f"Manifest missing 'busco_result' column: {manifest_file}")
 
     busco_results = sorted(manifest_df['busco_result'].to_list())
+    # How one copy is chosen for a Duplicated gene: 'top_score' (best BUSCO score) or 'peer'
+    # (highest mean identity to Complete copies from the same taxon, see peer_copy_selection.py)
+    copy_selection = str(snakemake.params.get('multi_copy_selection', 'top_score'))
+    if copy_selection not in ('top_score', 'peer'):
+        raise ValueError(f"multi_copy_selection must be 'top_score' or 'peer', not {copy_selection!r}")
+    peer_selection = use_multi_copy and copy_selection == 'peer'
     
     # Validate inputs exist
     if not busco_results:
@@ -689,9 +711,10 @@ def main():
     usable_taxonomy = load_usable_taxonomy(taxonomy_df)
     logger.info(f"Loaded taxonomy mapping with {len(taxonomy_df)} entries "
                 f"({len(usable_taxonomy)} with usable taxonomy)")
+    (output_dir / "multicopy_selection.tsv").unlink(missing_ok=True)
     
     # Process all BUSCO results - let errors bubble up
-    gene_sequences = process_all_busco_results(busco_results, use_multi_copy)
+    gene_sequences = process_all_busco_results(busco_results, use_multi_copy, keep_all_copies=peer_selection)
     
     # Validate we got meaningful results
     if not gene_sequences:
@@ -709,6 +732,19 @@ def main():
     processed_genomes, genome_list_file, hmms_file = reorganize_for_singlem_genome_input(
         gene_sequences, usable_taxonomy, genome_input_dir, min_sequences_per_gene,
         allow_missing_taxonomy=allow_missing_taxonomy,
+    if peer_selection:
+        import peer_copy_selection
+        n_jobs = getattr(snakemake, 'threads', 1)
+        logger.info(f"Choosing among duplicated copies by identity to taxonomic peers ({n_jobs} jobs)")
+        gene_sequences, selection_report = peer_copy_selection.select_peer_copies(
+            gene_sequences, usable_taxonomy, n_jobs=n_jobs)
+        peer_copy_selection.write_report(selection_report, output_dir / "multicopy_selection.tsv")
+        decided = [r for r in selection_report if r['chosen_identity'] != '']
+        agree = sum(r['agrees_with_top_score'] for r in decided)
+        logger.info(f"Copy selection: {len(selection_report)} genomes x genes with several copies; "
+                    f"{len(decided)} decided by peers ({agree} agree with the top BUSCO score), "
+                    f"{len(selection_report) - len(decided)} fell back to the top score (no peers)")
+
     )
     
     logger.info(f"Successfully completed aggregation: "

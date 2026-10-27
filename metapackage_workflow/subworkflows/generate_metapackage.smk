@@ -363,6 +363,7 @@ rule singlem_create:
         taxonomy_file  = SINGLEM["gene_input"]["gene"]["taxonomy"],
         target_domains = config["singlem"]["target_domains"]
     retries: TOTAL_ATTEMPTS
+        multi_copy_selection = config["busco"]["quality_control"].get("multi_copy_selection", "top_score"),
     resources: **RESOURCE_PROFILE(mem_scale=0.5, runtime="1h")
     log:
         log_path("singlem_create", "busco_gene")

@@ -41,6 +41,10 @@ busco:
     # Include Duplicated BUSCO genes, represented by their top-scoring copy (one sequence per
     # gene per genome). Must be set here: the workflow reads busco.quality_control.use_multi_copy.
     use_multi_copy: true
+    # Which copy represents a Duplicated gene: "peer" = the copy with the highest mean identity to
+    # Complete copies of the same gene from the same taxon (scripts/peer_copy_selection.py; reports
+    # every decision in multicopy_selection.tsv); "top_score" = best BUSCO score.
+    multi_copy_selection: peer
 
 # NCBI Entrez configuration
 ncbi:

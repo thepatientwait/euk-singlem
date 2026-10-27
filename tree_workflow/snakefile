@@ -215,6 +215,7 @@ rule all:
         NOTEBOOK_DIR + "/tree_diagnostics.ipynb",
         NOTEBOOK_DIR + "/tree_accuracy.ipynb",
         PUBLISH_MARKER
+        NOTEBOOK_DIR + "/copy_selection.ipynb",
 
 
 rule build_external_manifest_table:
@@ -306,7 +307,8 @@ rule external_busco_results_quality_control:
         manifest = EXTERNAL_PATHS["metadata"]["busco_qc"]
     params:
         min_complete_markers = int(BUSCO_CONFIG["min_complete_markers"]),
-        use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False))
+        use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False)),
+        multi_copy_selection = str(BUSCO_CONFIG.get("multi_copy_selection", "top_score"))
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
@@ -447,7 +449,8 @@ checkpoint aggregate_external_busco_sequences:
         min_sequences_per_gene = int(AGGREGATION_CONFIG.get("min_sequences_per_gene", 1)),
         allow_missing_taxonomy = bool(AGGREGATION_CONFIG.get("allow_missing_taxonomy", True)),
         # same switch as the QC rule above, so the marker count and the aggregated genes agree
-        use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False))
+        use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False)),
+        multi_copy_selection = str(BUSCO_CONFIG.get("multi_copy_selection", "top_score"))
     threads: 8
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
@@ -498,7 +501,8 @@ if SUBSET != "none":
         params:
             min_sequences_per_gene = int(AGGREGATION_CONFIG.get("min_sequences_per_gene", 1)),
             allow_missing_taxonomy = True,
-            use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False))
+            use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False)),
+            multi_copy_selection = str(BUSCO_CONFIG.get("multi_copy_selection", "top_score"))
         threads: 8
         retries: TOTAL_ATTEMPTS
         resources: **DEFAULT_RESOURCES
@@ -691,6 +695,49 @@ rule tree_accuracy:
 
 
 # Snapshot of the final results: trees, taxonomy metadata and the executed notebooks are copied into
+def _selection_logs():
+    """Decision logs (multicopy_selection.tsv) of the aggregations that feed the trees."""
+    base = Path(SUBSET_DIR) / "singlem_input" if SUBSET != "none" else METAPACKAGE_SINGLEM_INPUT_DIR
+    logs = [{"label": "base genomes" + ("" if SUBSET == "none" else f" (subset {SUBSET})"),
+             "path": _abs(base / "multicopy_selection.tsv")}]
+    if USE_EXTERNAL:
+        logs.append({"label": "external genomes",
+                     "path": _abs(Path(EXTERNAL_PATHS["aggregate"]["sequences_dir"]) / "multicopy_selection.tsv")})
+    return logs
+
+
+# Notebook on the choice of copy for Duplicated BUSCO genes (peer similarity vs top BUSCO score).
+# Reads the multicopy_selection.tsv logs of the aggregations; a log that does not exist (aggregated
+# with multi_copy_selection: top_score, or before this feature) is reported in the notebook.
+rule copy_selection:
+    input:
+        template = str(ROOT / "notebooks" / "copy_selection.ipynb"),
+        # order after the aggregations run by this workflow
+        external_ready = lambda wildcards: checkpoints.aggregate_external_busco_sequences.get().output.genome_input_genomes if USE_EXTERNAL else [],
+        subset_ready = SUBSET_GENOME_LIST if SUBSET != "none" else [],
+        taxonomy = TAXONOMY_PATHS["conservative"]
+    output:
+        notebook = NOTEBOOK_DIR + "/copy_selection.ipynb"
+    params:
+        notebook = str(ROOT / "notebooks" / "copy_selection.ipynb"),
+        nb_params = lambda wildcards, input: {
+            "label": _run_label(),
+            "scripts_dir": _abs(TREE_SCRIPTS),
+            "taxonomy": _abs(input.taxonomy),
+            "selections": _selection_logs(),
+            "out_dir": _abs(NOTEBOOK_DIR + "/tables/copy_selection"),
+        }
+    threads: 1
+    retries: TOTAL_ATTEMPTS
+    resources: **RESOURCE_PROFILE(mem_scale=2)
+    log:
+        log_path("copy_selection")
+    conda:
+        env("diagnostics")
+    script:
+        str(TREE_SCRIPTS / "run_notebook.py")
+
+
 # <tree.publish_dir>/<date_time>[_subset_<name>]/ (new directory per publish, never overwritten).
 # The marker output lives in the workflow directory, so the rule re-runs only when one of the
 # published files changed, not on every invocation.
@@ -717,6 +764,7 @@ def _publish_pairs():
         (NOTEBOOK_DIR + "/tree_diagnostics.ipynb", "notebooks/tree_diagnostics.ipynb"),
         (NOTEBOOK_DIR + "/tree_accuracy.ipynb", "notebooks/tree_accuracy.ipynb"),
     ]
+        (NOTEBOOK_DIR + "/copy_selection.ipynb", "notebooks/copy_selection.ipynb"),
     return pairs
 
 

@@ -46,6 +46,11 @@ busco:
   # gene per genome). Keep equal to busco.quality_control.use_multi_copy of the metapackage
   # workflow, which produces the base genomes' sequences.
   use_multi_copy: true
+  # Which copy represents a Duplicated gene: "peer" (highest mean identity to Complete copies of
+  # the same gene from the same taxon) or "top_score" (best BUSCO score). Applies to the external
+  # and subset aggregations here, where peers are only the genomes of that aggregation; the base
+  # genomes' choice is busco.quality_control.multi_copy_selection in the metapackage workflow.
+  multi_copy_selection: peer
 
 aggregation:
   min_sequences_per_gene: 20
