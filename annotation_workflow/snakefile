@@ -1,0 +1,184 @@
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(workflow.basedir).resolve()
+sys.path.insert(0, str(ROOT))
+
+configfile: str(ROOT / "config" / "config.yaml")
+
+ORTHODB     = config["orthodb"]
+PATHS       = config["paths"]
+SCRIPTS_DIR = ROOT / "scripts"
+FILES       = ORTHODB["files"]
+LEVEL       = int(ORTHODB["level_taxid"])
+PYTHON      = sys.executable   # the driver env runs the plain-python rules
+LOCAL_DIR   = str(ORTHODB.get("local_dir") or "")
+RAW         = PATHS["orthodb_raw"]
+EUK         = PATHS["orthodb_eukaryota"]
+INDEX       = PATHS["orthodb_index"]
+BASE_MEM_MB = int(config["resources"]["base_mem_mb"])
+ATTEMPTS    = int(config["resources"]["total_attempts"])
+
+SEQ_KEY = next((k for k, v in FILES.items() if v.get("kind") == "sequences"), None)
+FILE_NAME = {key: entry["name"] for key, entry in FILES.items()}
+NAME_TO_KEY = {name: key for key, name in FILE_NAME.items()}
+
+
+def log_path(rule_name, *wildcards):
+    return f"logs/{rule_name}" + "".join("/{" + w + "}" for w in wildcards) + ".log"
+
+
+ENVS_USED = ["diamond"]
+
+
+def env(name):
+    """Path of pixi environment `name` (created with `pixi install --all`); existence is checked at start."""
+    return str(ROOT / ".pixi" / "envs" / name)
+
+
+onstart:
+    # a missing env directory would otherwise be mistaken for an env *name* by snakemake
+    if not workflow.dryrun and not config.get("skip_env_check"):
+        for _name in ENVS_USED:
+            if not Path(env(_name)).is_dir():
+                raise WorkflowError(f"pixi environment {_name!r} not found at {env(_name)}; run `pixi install --all` in {ROOT}")
+
+
+def _print_summary():
+    if workflow.dryrun:
+        return
+    try:
+        from scripts.download_summary import summarise
+        summarise(config)
+    except Exception as err:  # noqa: BLE001 - must not hide the real exit status
+        print(f"[download_summary] could not summarise: {err}", file=sys.stderr)
+
+
+onsuccess:
+    _print_summary()
+
+
+onerror:
+    _print_summary()
+
+
+rule all:
+    input:
+        f"{INDEX}/orthodb_{LEVEL}.dmnd",
+        [f"{EUK}/{FILE_NAME[k]}" for k, v in FILES.items() if v.get("kind") != "sequences"],
+
+
+# --- getting the raw files ------------------------------------------------------------------------------------
+if LOCAL_DIR:
+    rule link_orthodb_file:
+        """Use a copy of the file that was downloaded by hand (orthodb.local_dir)."""
+        output:
+            f"{RAW}/{{name}}"
+        wildcard_constraints:
+            name = "|".join(map(re.escape, FILE_NAME.values()))
+        params:
+            source = lambda wildcards: str(Path(LOCAL_DIR) / wildcards.name)
+        localrule: True
+        log:
+            log_path("link_orthodb_file", "name")
+        shell:
+            "exec > {log} 2>&1; test -s {params.source} || {{ echo 'missing or empty: {params.source}'; exit 1; }}; "
+            "ln -sf {params.source} {output}"
+else:
+    rule fetch_orthodb_file:
+        """Download one OrthoDB file (resumable, atomic, retried; see scripts/fetch_file.py)."""
+        output:
+            f"{RAW}/{{name}}"
+        wildcard_constraints:
+            name = "|".join(map(re.escape, FILE_NAME.values()))
+        params:
+            url = lambda wildcards: f"{ORTHODB['base_url'].rstrip('/')}/{wildcards.name}",
+            md5 = lambda wildcards: (FILES[NAME_TO_KEY[wildcards.name]].get("md5") or ""),
+            min_bytes = int(config.get("min_download_bytes", 1)),
+            script = str(SCRIPTS_DIR / "fetch_file.py")
+        threads: 1
+        retries: ATTEMPTS - 1
+        resources:
+            orthodb_conn = 1,
+            mem_mb = 1000,
+            runtime = "12h"
+        log:
+            log_path("fetch_orthodb_file", "name")
+        shell:
+            "exec > {log} 2>&1; "
+            "{PYTHON} {params.script} {params.url} {output} --min-bytes {params.min_bytes} "
+            "$([ -n '{params.md5}' ] && echo --md5 {params.md5})"
+
+
+# --- eukaryote subset -------------------------------------------------------------------------------------------
+def _subset_args(wildcards):
+    column = FILES[NAME_TO_KEY[wildcards.name]].get("column")
+    return "" if column is None else f"--column {int(column)}"
+
+
+rule orthodb_subset:
+    """Keep only the OGs of the chosen level (tables whose `column` is null are copied unchanged)."""
+    input:
+        f"{RAW}/{{name}}"
+    output:
+        f"{EUK}/{{name}}"
+    wildcard_constraints:
+        name = "|".join(map(re.escape, [v["name"] for v in FILES.values() if v.get("kind") != "sequences"]))
+    params:
+        script = str(SCRIPTS_DIR / "orthodb_tables.py"),
+        args = _subset_args,
+        level = LEVEL,
+        copy_only = lambda wildcards: FILES[NAME_TO_KEY[wildcards.name]].get("column") is None
+    retries: ATTEMPTS - 1
+    resources:
+        mem_mb = 2000
+    log:
+        log_path("orthodb_subset", "name")
+    shell:
+        "exec > {log} 2>&1; "
+        "if [ '{params.copy_only}' = 'True' ]; then cp -L {input} {output}; "
+        "else {PYTHON} {params.script} subset {input} {output} {params.args} --level-taxid {params.level}; fi"
+
+
+# --- DIAMOND database of the OG sequences -----------------------------------------------------------------------
+if SEQ_KEY:
+    rule orthodb_fasta:
+        """OG sequence table -> FASTA with `>gene|og` headers, restricted to the chosen level."""
+        input:
+            f"{RAW}/{FILES[SEQ_KEY]['name']}"
+        output:
+            temp(f"{INDEX}/orthodb_{LEVEL}.faa")
+        params:
+            script = str(SCRIPTS_DIR / "orthodb_tables.py"),
+            og = int(FILES[SEQ_KEY].get("og_column", 0)),
+            gene = int(FILES[SEQ_KEY].get("gene_column", 1)),
+            seq = int(FILES[SEQ_KEY].get("seq_column", 2)),
+            level = LEVEL
+        retries: ATTEMPTS - 1
+        resources:
+            mem_mb = 2000,
+            runtime = "6h"
+        log:
+            log_path("orthodb_fasta")
+        shell:
+            "exec > {log} 2>&1; {PYTHON} {params.script} fasta {input} {output} "
+            "--og-column {params.og} --gene-column {params.gene} --seq-column {params.seq} --level-taxid {params.level}"
+
+    rule orthodb_diamond_index:
+        """DIAMOND database of the OG sequences (hits are named gene|og)."""
+        input:
+            f"{INDEX}/orthodb_{LEVEL}.faa"
+        output:
+            f"{INDEX}/orthodb_{LEVEL}.dmnd"
+        threads: 8
+        retries: ATTEMPTS - 1
+        resources:
+            mem_mb = 32000,
+            runtime = "6h"
+        log:
+            log_path("orthodb_diamond_index")
+        conda:
+            env("diamond")
+        shell:
+            "exec > {log} 2>&1; diamond makedb --in {input} --db {INDEX}/orthodb_{LEVEL} --threads {threads}"

@@ -1,0 +1,27 @@
+[workspace]
+name = "annotation_workflow"
+channels = ["conda-forge", "bioconda"]
+platforms = ["linux-64"]
+
+# Same layout as the other workflows: a default env that runs snakemake, and one env per tool group under
+# .pixi/envs/<name>, referenced from the snakefile with env("<name>").
+#   pixi install --all
+#   pixi run snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda --keep-going
+
+[dependencies]
+python = "3.12.*"
+snakemake = ">=9.0"
+snakemake-executor-plugin-cluster-generic = "*"
+polars = ">=1.39.3,<2"
+pyyaml = "*"
+curl = "*"
+
+[activation]
+env = { PATH = "/mnt/weka/pkg/cmr/sw/conda/condabin:$PATH" }
+
+[feature.diamond.dependencies]
+diamond = ">=2.1"
+
+[environments]
+default = { solve-group = "all" }
+diamond = { features = ["diamond"], no-default-feature = true }

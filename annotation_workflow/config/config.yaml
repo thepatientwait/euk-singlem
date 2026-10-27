@@ -1,0 +1,55 @@
+# annotation_workflow: find gene families (orthologous groups) beyond the 129 BUSCO genes, to test a marker set
+# of our own. BUSCO stays in metapackage_workflow; this workflow only adds the OG-based route.
+
+orthodb:
+  version: "v12"
+  # Level whose OGs are used (2759 = Eukaryota; OG ids look like 12345at2759, as in BUSCO).
+  level_taxid: 2759
+  # Use a copy you downloaded yourself: a directory that holds the files named below. When set, nothing is
+  # downloaded and the files are linked in. Leave empty to download (needs the cluster to reach OrthoDB).
+  local_dir: ""
+  base_url: "https://data.orthodb.org/v12/download"
+  # Max simultaneous downloads (resource orthodb_conn; pass --resources orthodb_conn=<n>, the default below
+  # applies when running through the profile).
+  max_connections: 2
+  # Files to fetch. NOT VERIFIED: the sandbox that wrote this could not reach data.orthodb.org (HTTP 403), so
+  # file names and column numbers follow OrthoDB's documentation from memory. Check them against the download
+  # page and fix them here before the first run; `column` is the 0-based column of the OG id.
+  files:
+    og_sequences:
+      name: "odb12v1_all_og_fasta.tab.gz"
+      md5: ""            # optional
+      column: 0
+      kind: sequences    # a tab table of OG id, gene id, sequence (turned into the DIAMOND database)
+      og_column: 0
+      gene_column: 1
+      seq_column: 2
+    og_genes:
+      name: "odb12v1_OG2genes.tab.gz"
+      md5: ""
+      column: 0
+      kind: table
+    ogs:
+      name: "odb12v1_OGs.tab.gz"
+      md5: ""
+      column: 0
+      kind: table
+    species:
+      name: "odb12v1_species.tab.gz"
+      md5: ""
+      column: null       # copied whole (small)
+      kind: table
+
+# A file smaller than this is an error page, not data
+min_download_bytes: 1000
+
+resources:
+  base_mem_mb: 4000
+  base_runtime: "2h"
+  total_attempts: 3
+
+paths:
+  orthodb_raw: "outputs/orthodb/raw"
+  orthodb_eukaryota: "outputs/orthodb/eukaryota"
+  orthodb_index: "outputs/orthodb/index"
+  summary: "outputs/reports/download_summary.tsv"
