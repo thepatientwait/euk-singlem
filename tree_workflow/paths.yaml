@@ -1,6 +1,10 @@
 paths:
   output_root: "output"
 
+  # executed notebooks (templates stay in notebooks/; a subset run uses notebooks/rendered/subset_<name>/)
+  notebooks:
+    rendered: "notebooks/rendered"
+
   eukcc_db:
     root_dir: "db/eukcc"
     archive: "db/eukcc/eukcc2_db_ver_1.2.tar.gz"

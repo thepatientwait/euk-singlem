@@ -199,7 +199,8 @@ def _abs(path):
 
 
 # one folder for the global notebooks (they compare all {derep} x {copies} variants)
-NOTEBOOK_DIR = ("output" if SUBSET == "none" else SUBSET_DIR) + "/notebooks"
+# executed copies are kept with their templates: notebooks/rendered/ (a subset run gets its own folder)
+NOTEBOOK_DIR = WORKFLOW_PATHS["notebooks"]["rendered"] + ("" if SUBSET == "none" else f"/subset_{SUBSET}")
 PUBLISH_DIR = str(config.get("publish_dir", TREE_CONFIG.get("publish_dir", "~/trees")))   # `--config publish_dir=...` overrides
 PUBLISH_MARKER = ("output" if SUBSET == "none" else SUBSET_DIR) + "/published_to.txt"
 
@@ -214,8 +215,8 @@ rule all:
         expand(TAXONOMY_PATHS["metadata"], derep=DEREP_MODES, copies=COPY_MODES),
         NOTEBOOK_DIR + "/tree_diagnostics.ipynb",
         NOTEBOOK_DIR + "/tree_accuracy.ipynb",
-        PUBLISH_MARKER
         NOTEBOOK_DIR + "/copy_selection.ipynb",
+        PUBLISH_MARKER
 
 
 rule build_external_manifest_table:
@@ -694,7 +695,6 @@ rule tree_accuracy:
         str(TREE_SCRIPTS / "run_notebook.py")
 
 
-# Snapshot of the final results: trees, taxonomy metadata and the executed notebooks are copied into
 def _selection_logs():
     """Decision logs (multicopy_selection.tsv) of the aggregations that feed the trees."""
     base = Path(SUBSET_DIR) / "singlem_input" if SUBSET != "none" else METAPACKAGE_SINGLEM_INPUT_DIR
@@ -738,6 +738,7 @@ rule copy_selection:
         str(TREE_SCRIPTS / "run_notebook.py")
 
 
+# Snapshot of the final results: trees, taxonomy metadata and the executed notebooks are copied into
 # <tree.publish_dir>/<date_time>[_subset_<name>]/ (new directory per publish, never overwritten).
 # The marker output lives in the workflow directory, so the rule re-runs only when one of the
 # published files changed, not on every invocation.
@@ -763,8 +764,8 @@ def _publish_pairs():
         (TAXONOMY_PATHS["conservative"], "conservative_taxonomy.tsv"),
         (NOTEBOOK_DIR + "/tree_diagnostics.ipynb", "notebooks/tree_diagnostics.ipynb"),
         (NOTEBOOK_DIR + "/tree_accuracy.ipynb", "notebooks/tree_accuracy.ipynb"),
-    ]
         (NOTEBOOK_DIR + "/copy_selection.ipynb", "notebooks/copy_selection.ipynb"),
+    ]
     return pairs
 
 
@@ -917,18 +918,18 @@ rule phylorank_red:
         """
         exec > {log} 2>&1
         mkdir -p {params.red_dir}
+        # a stale raw copy would be mistaken for this run's PhyloRank output
+        rm -f {params.red_dir}/*.phylorank_raw.tree
         {params.command} outliers -t {input.trusted_taxa} {input.decorated_tree} {input.taxonomy} {params.red_dir}
         test -s {output.red_tree}
         test -s {output.red_cutoffs}
-        """
-        # a stale raw copy would be mistaken for this run's PhyloRank output
-        rm -f {params.red_dir}/*.phylorank_raw.tree
-
-
-rule assign_taxonomy:
         # PhyloRank's median-over-rootings RED can fall below the parent's (negative branch lengths);
         # make both RED trees monotone in place (raw PhyloRank trees kept as *.phylorank_raw.tree)
         python {params.monotone} {output.red_tree} {params.red_dir}/*.scaled.tree
+        """
+
+
+rule assign_taxonomy:
     input:
         red_tree = TAXONOMY_PATHS["red_tree"],
         red_cutoffs = TAXONOMY_PATHS["red_cutoffs"],
