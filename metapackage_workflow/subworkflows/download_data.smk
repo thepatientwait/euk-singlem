@@ -32,6 +32,7 @@ from helpers import (
     build_all_genomes_to_download,
     create_resource_profile_factory,
     get_existing_genome_paths_from_metadata,
+    get_expected_genome_paths,
     get_on_disk_genome_paths,
     get_genome_name,
     get_p10k_genome_url,
@@ -93,6 +94,25 @@ ALL_GENOME_DOWNLOAD_TARGETS = build_all_genomes_to_download(
 )
 
 localrules: download_jgi_metadata, jgi_request_restore, download_p10k_metadata, discover_ncbi_genomes, build_unified_manifest, fetch_ncbi_taxonomy, cleanup_failed_genomes, write_genome_manifest,
+
+
+def _print_download_summary():
+    """Print what is still not downloaded (never raises: it must not hide the real exit status)."""
+    if workflow.dryrun:
+        return
+    try:
+        from scripts.download_summary import summarise
+        summarise()
+    except Exception as err:  # noqa: BLE001
+        print(f"[download_summary] could not summarise: {err}", file=sys.stderr)
+
+
+onsuccess:
+    _print_download_summary()
+
+
+onerror:
+    _print_download_summary()
 
 
 rule all:
@@ -507,6 +527,14 @@ rule write_genome_manifest:
                     valid_genome_paths.append(genome_path)
                 else:
                     missing_taxonomy.append(genome_acc)
+
+            expected_total = len(genome_paths)
+            absent = len(get_expected_genome_paths(GROUPS)) - expected_total
+            if absent:
+                print(
+                    f"[write_genome_manifest] WARNING: {absent} expected genomes are absent or empty on "
+                    "disk and not in the manifest; see outputs/metadata/reports/download_summary.tsv"
+                )
 
             if missing_taxonomy:
                 print(
