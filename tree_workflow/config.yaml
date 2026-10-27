@@ -51,6 +51,7 @@ busco:
   # and subset aggregations here, where peers are only the genomes of that aggregation; the base
   # genomes' choice is busco.quality_control.multi_copy_selection in the metapackage workflow.
   multi_copy_selection: peer
+  multi_copy_min_gain: 0.02   # see the metapackage config
 
 aggregation:
   min_sequences_per_gene: 20

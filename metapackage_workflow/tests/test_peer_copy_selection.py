@@ -127,3 +127,31 @@ class TestKeepAllCopies(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMinGain(unittest.TestCase):
+    def build(self, rng_seed=3, mutate_fraction=0.05):
+        rng = random.Random(rng_seed)
+        ortholog = random_protein(rng)
+        genes, taxonomy, seqs = {}, {}, {}
+        for i in range(5):
+            genome = f"peer{i}"
+            taxonomy[genome] = tax("F1", "G1")
+            seqs[f"{genome}|g1|1"] = info(genome, "g1", 1, mutate(rng, ortholog, 0.1))
+        taxonomy["cand"] = tax("F1", "G1")
+        # both candidates are nearly equally similar to the peers; copy 1 has the better score
+        seqs["cand|g1|1"] = info("cand", "g1", 1, mutate(rng, ortholog, mutate_fraction), "Duplicated", 200.0)
+        seqs["cand|g1|2"] = info("cand", "g1", 2, mutate(rng, ortholog, mutate_fraction), "Duplicated", 150.0)
+        return {"g1": seqs}, taxonomy
+
+    def test_small_difference_keeps_top_score(self):
+        genes, taxonomy = self.build()
+        _, report = pcs.select_peer_copies(genes, taxonomy, min_gain=1.0)   # impossible margin
+        self.assertEqual(report[0]["chosen_copy"], report[0]["top_score_copy"])
+        self.assertEqual(report[0]["agrees_with_top_score"], 1)
+
+    def test_margin_zero_follows_identity(self):
+        genes, taxonomy = self.build()
+        _, report = pcs.select_peer_copies(genes, taxonomy, min_gain=0.0)
+        best = max(report[0]["chosen_identity"], report[0]["top_score_identity"])
+        self.assertEqual(report[0]["chosen_identity"], best)

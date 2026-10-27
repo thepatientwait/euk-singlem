@@ -10,6 +10,10 @@ deepest rank (genus ... phylum) that has at least ``min_peers`` such genomes; at
 used, picked evenly from the sorted genome ids so reruns choose the same ones. Genomes without a usable
 taxonomy, or without any Complete peer even at phylum level, fall back to the top-scoring copy.
 
+``min_gain``: the top BUSCO score is only overruled when the best peer-like copy beats it by at least this
+much mean identity (default 0.02). Smaller differences are within noise (median gain of a switch is ~0.01), so
+the score decides.
+
 Ties: higher mean identity, then higher BUSCO score, then longer, then lower copy number.
 """
 from collections import defaultdict
@@ -104,7 +108,7 @@ def _score_task(candidates: List[str], peers: List[str]) -> List[float]:
 
 
 def select_peer_copies(gene_sequences: Dict[str, Dict[str, Dict]], usable_taxonomy: Dict[str, str],
-                       min_peers: int = 3, max_peers: int = 8, n_jobs: int = 1):
+                       min_peers: int = 3, max_peers: int = 8, n_jobs: int = 1, min_gain: float = 0.02):
     """Reduce every genome with several candidate copies of a gene to one copy.
 
     gene_sequences: {busco_id: {sequence_id: info}} where info has genome_acc, status, score, length,
@@ -169,6 +173,8 @@ def select_peer_copies(gene_sequences: Dict[str, Dict[str, Dict]], usable_taxono
         best = order[0]
         top_score = max(range(len(infos)), key=lambda i: (float(infos[i].get("score") or 0.0),
                                                            infos[i].get("length", 0), -i))
+        if best != top_score and identities[best] - identities[top_score] < min_gain:
+            best = top_score   # within noise: keep the top BUSCO score
         report.append({
             "busco_id": busco_id, "genome_acc": genome, "n_candidates": len(infos),
             "chosen_copy": infos[best].get("copy_number", best + 1),

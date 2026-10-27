@@ -737,7 +737,8 @@ def main():
         n_jobs = getattr(snakemake, 'threads', 1)
         logger.info(f"Choosing among duplicated copies by identity to taxonomic peers ({n_jobs} jobs)")
         gene_sequences, selection_report = peer_copy_selection.select_peer_copies(
-            gene_sequences, usable_taxonomy, n_jobs=n_jobs)
+            gene_sequences, usable_taxonomy, n_jobs=n_jobs,
+            min_gain=float(snakemake.params.get('multi_copy_min_gain', 0.02)))
         peer_copy_selection.write_report(selection_report, output_dir / "multicopy_selection.tsv")
         decided = [r for r in selection_report if r['chosen_identity'] != '']
         agree = sum(r['agrees_with_top_score'] for r in decided)

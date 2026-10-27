@@ -309,7 +309,8 @@ rule external_busco_results_quality_control:
     params:
         min_complete_markers = int(BUSCO_CONFIG["min_complete_markers"]),
         use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False)),
-        multi_copy_selection = str(BUSCO_CONFIG.get("multi_copy_selection", "top_score"))
+        multi_copy_selection = str(BUSCO_CONFIG.get("multi_copy_selection", "top_score")),
+        multi_copy_min_gain = float(BUSCO_CONFIG.get("multi_copy_min_gain", 0.02))
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
@@ -451,7 +452,8 @@ checkpoint aggregate_external_busco_sequences:
         allow_missing_taxonomy = bool(AGGREGATION_CONFIG.get("allow_missing_taxonomy", True)),
         # same switch as the QC rule above, so the marker count and the aggregated genes agree
         use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False)),
-        multi_copy_selection = str(BUSCO_CONFIG.get("multi_copy_selection", "top_score"))
+        multi_copy_selection = str(BUSCO_CONFIG.get("multi_copy_selection", "top_score")),
+        multi_copy_min_gain = float(BUSCO_CONFIG.get("multi_copy_min_gain", 0.02))
     threads: 8
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
@@ -503,7 +505,8 @@ if SUBSET != "none":
             min_sequences_per_gene = int(AGGREGATION_CONFIG.get("min_sequences_per_gene", 1)),
             allow_missing_taxonomy = True,
             use_multi_copy = bool(BUSCO_CONFIG.get("use_multi_copy", False)),
-            multi_copy_selection = str(BUSCO_CONFIG.get("multi_copy_selection", "top_score"))
+            multi_copy_selection = str(BUSCO_CONFIG.get("multi_copy_selection", "top_score")),
+            multi_copy_min_gain = float(BUSCO_CONFIG.get("multi_copy_min_gain", 0.02))
         threads: 8
         retries: TOTAL_ATTEMPTS
         resources: **DEFAULT_RESOURCES

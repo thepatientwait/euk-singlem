@@ -45,6 +45,9 @@ busco:
     # Complete copies of the same gene from the same taxon (scripts/peer_copy_selection.py; reports
     # every decision in multicopy_selection.tsv); "top_score" = best BUSCO score.
     multi_copy_selection: peer
+    # The top score is only overruled when the best peer-like copy beats it by this much mean identity
+    # (smaller differences are within noise).
+    multi_copy_min_gain: 0.02
 
 # NCBI Entrez configuration
 ncbi:
