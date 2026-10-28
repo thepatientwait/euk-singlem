@@ -12,6 +12,7 @@ from joblib import Parallel, delayed
 # Import the logging configuration
 sys.path.append(str(Path(__file__).parent))
 from log_config import configure_logger
+from busco_table import match_record, read_full_table
 
 # Configure logger
 logger = configure_logger(__file__)
@@ -44,7 +45,7 @@ def parse_busco_file(busco_file: Path, use_multi_copy: bool,
     logger.info(f"Parsing BUSCO file for {group}/{genome_acc}")
     
     # Read BUSCO full table, skipping comment lines that start with #
-    busco_df = pl.read_csv(busco_file, separator='\t', skip_rows=2).rename({'# Busco id': 'Busco id'})
+    busco_df = read_full_table(busco_file)  # genome or transcriptome mode, same columns
     
     # Debug: log the column names to understand the structure
     logger.debug(f"BUSCO file columns: {busco_df.columns}")
@@ -166,27 +167,9 @@ def clean_protein(seq: str) -> str:
 
 
 def _match_busco_record(records, row: Dict, used_record_ids: set):
-    """Match a BUSCO table row to its FASTA record using sequence ID syntax."""
-    sequence_name = str(row.get('Sequence', ''))
-    start = row.get('Gene Start')
-    end = row.get('Gene End')
-    strand = str(row.get('Strand', ''))
-    try:
-        coordinate_key = (sequence_name, min(int(start), int(end)), max(int(start), int(end)), strand)
-    except (TypeError, ValueError):
-        coordinate_key = None
-
-    for record in records:
-        if record.id in used_record_ids:
-            continue
-        match = re.search(r'\|([^|:]+):(\d+)-(\d+)\|([+-])(?:\s|$)', record.description)
-        if match is None:
-            continue
-        record_key = (match.group(1), min(int(match.group(2)), int(match.group(3))),
-                      max(int(match.group(2)), int(match.group(3))), match.group(4))
-        if coordinate_key == record_key:
-            return record
-    return None
+    """Match a BUSCO table row to its FASTA record by coordinates (strand too when the table has it)."""
+    return match_record(records, str(row.get('Sequence', '')), row.get('Gene Start'), row.get('Gene End'),
+                        row.get('Strand'), used_record_ids)
 
 
 def calculate_sequence_length(sequence: str) -> int:

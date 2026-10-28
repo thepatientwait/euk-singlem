@@ -123,6 +123,9 @@ def run(a) -> dict:
         table = results.get(genome)
         if table is None:
             return name, "not_in_manifest", None, None
+        if table.parts[-4] == "tsa":
+            # transcriptomes are spliced: no gene model, no introns. Never judged for window choice.
+            return name, "transcriptome", None, table
         status, model = gene_model(table, busco_id, a.use_multi_copy)
         return name, status, model, table
 

@@ -18,10 +18,13 @@ download:
     ncbi:
       metadata: "outputs/metadata/source/ncbi/ncbi_genomes.tsv"
       lineages: "outputs/metadata/taxonomy/ncbi_lineages.jsonl"
+    tsa:
+      metadata: "outputs/metadata/source/tsa/tsa_projects.tsv"
 
   genomes:
     by_group: "outputs/genomes/{group}/{genome_acc}.fasta.gz"
     ncbi: "outputs/genomes/ncbi/{genome_acc}.fasta.gz"
+    tsa: "outputs/genomes/tsa/{genome_acc}.fasta.gz"
     p10k: "outputs/genomes/p10k/{genome_acc}.fasta.gz"
 
   cleanup:
@@ -50,6 +53,8 @@ generate:
   derep:
     cluster_definitions: "outputs/metadata/qc/genome_clusters.tsv"
     representatives: "outputs/metadata/qc/dereplicated_genome_representatives.txt"
+    # spliced CDS of each genome's marker genes; the file stem matches the quality report (<acc>.fasta)
+    marker_cds: "outputs/derep/marker_cds/{group}/{genome_acc}.fasta.gz"
 
   singlem:
     config:

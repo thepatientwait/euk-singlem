@@ -2,7 +2,7 @@
 """
 Build unified download manifest from NCBI, P10K, and JGI metadata.
 
-Consolidates metadata from three sources, resolves missing tax IDs, and outputs a
+Consolidates metadata from four sources (JGI, P10K, NCBI genomes, NCBI TSA transcriptomes), resolves missing tax IDs, and outputs a
 single manifest for the unified download pipeline.
 
 Output columns: genome_acc, tax_id, download_source, group, original_name
@@ -24,6 +24,7 @@ JGI_METADATA_FILES = list(snakemake.input.jgi_csvs)
 JGI_JSON_FILES = list(snakemake.input.jgi_jsons)
 P10K_METADATA_FILE = snakemake.input['p10k_csv']
 NCBI_METADATA_FILE = snakemake.input['ncbi_tsv']
+TSA_METADATA_FILES = list(getattr(snakemake.input, 'tsa_tsv', []) or [])  # empty when TSA is disabled
 OUTPUT_MANIFEST = snakemake.output['manifest']
 NCBI_EMAIL = snakemake.params['ncbi_email']
 
@@ -214,7 +215,13 @@ def main():
     logger.info(f"Removed {ncbi_before - ncbi_manifest.height} overlapping NCBI records")
     
     # Combine manifests
-    unified = pl.concat([jgi_manifest, p10k_manifest, ncbi_manifest]).unique()
+    manifests = [jgi_manifest, p10k_manifest, ncbi_manifest]
+    for tsa_file in TSA_METADATA_FILES:
+        # same columns as ncbi_genomes.tsv (extra project columns are ignored); group is "tsa"
+        tsa_manifest = load_ncbi_metadata(tsa_file)
+        logger.info(f"Loaded {tsa_manifest.height} TSA transcriptome records")
+        manifests.append(tsa_manifest)
+    unified = pl.concat(manifests).unique()
     logger.info(f"Combined manifest: {unified.height} records")
     
     # Resolve P10K tax IDs (if needed)

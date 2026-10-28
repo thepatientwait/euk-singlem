@@ -268,6 +268,17 @@ def get_ncbi_genome_accs() -> Tuple[str, ...]:
     )
 
 
+def get_tsa_genome_accs() -> Tuple[str, ...]:
+    """TSA transcriptome accessions selected by discover_tsa (empty until the metadata exists).
+
+    Not cached: the file is small, and it is rewritten when TSA discovery is rerun.
+    """
+    metadata = Path("outputs/metadata/source/tsa/tsa_projects.tsv")
+    if not metadata.exists():
+        return tuple()
+    return tuple(pl.read_csv(metadata, separator="\t")["genome_acc"].unique().sort().to_list())
+
+
 @lru_cache(maxsize=128)
 def get_successful_genome_accs(group: str) -> Tuple[str, ...]:
     """Get sorted list of successfully downloaded genomes for a group. Cached for DAG speed."""
@@ -308,6 +319,7 @@ def get_expected_genome_paths(
     jgi_checkpoint_getter: Optional[Callable] = None,
     p10k_checkpoint_getter: Optional[Callable] = None,
     ncbi_checkpoint_getter: Optional[Callable] = None,
+    tsa_checkpoint_getter: Optional[Callable] = None,
 ) -> List[str]:
     """All genome paths listed in the metadata (whether or not they exist on disk).
 
@@ -328,6 +340,10 @@ def get_expected_genome_paths(
     if ncbi_checkpoint_getter:
         ncbi_checkpoint_getter()
     paths.extend(f"outputs/genomes/ncbi/{acc}.fasta.gz" for acc in get_ncbi_genome_accs())
+
+    if tsa_checkpoint_getter:
+        tsa_checkpoint_getter()
+    paths.extend(f"outputs/genomes/tsa/{acc}.fasta.gz" for acc in get_tsa_genome_accs())
 
     return paths
 
@@ -400,6 +416,7 @@ def build_all_genomes_to_download(
     ncbi_checkpoint_getter: Callable,
     retry_failed: bool = False,
     skip_jgi_unrestored: bool = False,
+    tsa_checkpoint_getter: Optional[Callable] = None,
 ) -> Callable:
     """Input function returning only genomes that still need a download job.
 
@@ -411,7 +428,8 @@ def build_all_genomes_to_download(
     """
     def _get_all_genomes_to_download(wildcards):
         expected = get_expected_genome_paths(
-            groups, jgi_checkpoint_getter, p10k_checkpoint_getter, ncbi_checkpoint_getter
+            groups, jgi_checkpoint_getter, p10k_checkpoint_getter, ncbi_checkpoint_getter,
+            tsa_checkpoint_getter,
         )
         if retry_failed:
             # An existing zero-byte file counts as up to date for Snakemake, so remove the
@@ -465,7 +483,15 @@ def get_existing_genome_paths_from_metadata(groups: List[str]) -> List[str]:
         if path.exists() and path.stat().st_size > 0:
             genome_paths.append(str(path))
 
-    print(f"Found {len(genome_paths) - jgi_count - p10k_count} existing genomes from NCBI metadata.")
+    ncbi_count = len(genome_paths) - jgi_count - p10k_count
+    print(f"Found {ncbi_count} existing genomes from NCBI metadata.")
+
+    for genome_acc in get_tsa_genome_accs():
+        path = Path(f"outputs/genomes/tsa/{genome_acc}.fasta.gz")
+        if path.exists() and path.stat().st_size > 0:
+            genome_paths.append(str(path))
+
+    print(f"Found {len(genome_paths) - jgi_count - p10k_count - ncbi_count} existing TSA transcriptomes.")
 
     return sorted(genome_paths)
 
@@ -742,7 +768,7 @@ def build_dereplicated_genome_list_factory(
                     # Just accession; need to infer group from filesystem
                     # Try to find the genome in outputs/genomes
                     genome_accs = []
-                    for group in ["fungi", "algae", "p10k"]:
+                    for group in ["fungi", "algae", "p10k", "ncbi", "tsa"]:
                         genome_path = Path(f"outputs/genomes/{group}/{line}.fasta.gz")
                         if genome_path.exists():
                             dereplicated_genomes.append(str(genome_path))

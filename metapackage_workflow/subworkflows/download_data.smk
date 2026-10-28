@@ -85,6 +85,7 @@ ALL_GENOME_DOWNLOAD_TARGETS = build_all_genomes_to_download(
     jgi_checkpoint_getter=lambda group: checkpoints.download_jgi_metadata.get(group=group),
     p10k_checkpoint_getter=lambda: checkpoints.download_p10k_metadata.get(),
     ncbi_checkpoint_getter=lambda: checkpoints.discover_ncbi_genomes.get(),
+    tsa_checkpoint_getter=(lambda: checkpoints.discover_tsa.get()) if config.get("tsa", {}).get("enabled") else None,
     # Genomes already on disk (including zero-byte failure markers) get no download job.
     # Set retry_failed_downloads: true in config.yaml to re-request the zero-byte ones.
     retry_failed=bool(config.get("retry_failed_downloads", False)),
@@ -93,7 +94,7 @@ ALL_GENOME_DOWNLOAD_TARGETS = build_all_genomes_to_download(
     skip_jgi_unrestored=not _flag("jgi_wait_for_restore"),
 )
 
-localrules: download_jgi_metadata, jgi_request_restore, download_p10k_metadata, discover_ncbi_genomes, build_unified_manifest, fetch_ncbi_taxonomy, cleanup_failed_genomes, write_genome_manifest,
+localrules: download_jgi_metadata, jgi_request_restore, download_p10k_metadata, discover_ncbi_genomes, discover_tsa, build_unified_manifest, fetch_ncbi_taxonomy, cleanup_failed_genomes, write_genome_manifest,
 
 
 def _print_download_summary():
@@ -265,6 +266,48 @@ checkpoint discover_ncbi_genomes:
     script:
         str(SCRIPTS_DIR / "discover_ncbi_genomes.py")
 
+checkpoint discover_tsa:
+    """NCBI TSA transcriptomes of taxa that no genome covers (see scripts/discover_tsa.py).
+
+    The taxonomy mapping is read by path (not an input: it depends on this rule through the unified
+    manifest); rerun with --forcerun discover_tsa after the mapping changes.
+    """
+    input:
+        ncbi_tsv = ancient(METADATA["ncbi"]["metadata"]),
+        p10k_csv = ancient(METADATA["p10k"]["csv"]),
+    output:
+        metadata = METADATA["tsa"]["metadata"]
+    params:
+        email = config["ncbi"]["email"],
+        taxonomy = METADATA["taxonomy"]["mapping"],
+        only_novel_taxa = config["tsa"]["only_novel_taxa"],
+        novel_level = config["tsa"]["novel_level"],
+        min_size_mb = config["tsa"]["min_size_mb"],
+        max_projects = config["tsa"]["max_projects"],
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    log:
+        log_path("discover_tsa")
+    script:
+        str(SCRIPTS_DIR / "discover_tsa.py")
+
+
+rule download_tsa:
+    input:
+        # ancient(): a regenerated project list must not re-download existing transcriptomes
+        # (download_tsa.py skips existing outputs).
+        metadata = ancient(METADATA["tsa"]["metadata"])
+    output:
+        genome = GENOMES["tsa"]
+    threads: 1
+    retries: TOTAL_ATTEMPTS
+    resources: **RESOURCE_PROFILE(mem_scale=2, fixed_mem=True)
+    log:
+        log_path("download_tsa", "genome_acc")
+    script:
+        str(SCRIPTS_DIR / "download_tsa.py")
+
+
 # TODO: REMOVE
 rule build_unified_manifest:
     """Consolidate NCBI, P10K, and JGI metadata into unified download manifest."""
@@ -273,7 +316,9 @@ rule build_unified_manifest:
         # ancient(): a restore-status refresh must not rebuild the manifest and re-query NCBI taxonomy
         jgi_jsons  = [ancient(METADATA["jgi"]["json"].format(group=group)) for group in GROUPS],
         p10k_csv   = METADATA["p10k"]["csv"],
-        ncbi_tsv   = METADATA["ncbi"]["metadata"]
+        ncbi_tsv   = METADATA["ncbi"]["metadata"],
+        # only when TSA is enabled; discover_tsa is a checkpoint, so the file exists when this runs
+        tsa_tsv    = [METADATA["tsa"]["metadata"]] if config.get("tsa", {}).get("enabled") else []
     output:
         manifest = MANIFEST["unified"]
     params:
