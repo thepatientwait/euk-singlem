@@ -1,6 +1,6 @@
 # MEMORY: current state, decisions and gotchas
 
-Last updated: 2026-10-28. Update the status table and decisions when they change; put narrative in `HISTORY.md`,
+Last updated: 2026-10-28 (branches: `transcripts` = TSA + galah derep, `annotation` = OrthoDB/own markers; base `feature/v2-ncbi-hybrid`). Update the status table and decisions when they change; put narrative in `HISTORY.md`,
 open work in `TODO.md`, code locations in `ARCHITECTURE.md`.
 
 ## Project
@@ -20,7 +20,8 @@ submit via `snakemake_mqsub`, the user starts big runs.
 | Intron-aware windows, exon-block transcripts, `*` fix | Implemented and committed; verified on `family5` subset only. Full survey needs phase 2 |
 | Per-gene packages (129 genes) | Must be regenerated (new `{introns}` paths, `*` fix) |
 | Final metapackage | Not built |
-| TSA transcriptomes | Not started (plan in `TODO.md`) |
+| TSA transcriptomes | Code written on branch `transcripts`: discovery (377 novel projects, ~7 GB), download, manifest, BUSCO transcriptome mode, aggregation, CDS extraction, intron-survey exclusion. Coolia BUSCO trial OK. Nothing downloaded into `outputs/genomes/tsa/` yet; BUSCO on TSA not run |
+| Derep | galah on marker CDS implemented (`extract_marker_cds`, `dereplicate_genomes`); validated on 1,303 genomes. Not run on the full set (needs phase-2 BUSCO) |
 | tree_workflow | RED monotone fix, MIXED majority naming, peer copy selection, label masking all done; tested on `family5` only. Full tree not run |
 | annotation_workflow | OrthoDB download rules written; file names/columns unverified (403 from sandbox) |
 | benchmarking_workflow | Early stage; needs `final.smpkg`; `plan.md` uncommitted in nested repo |
@@ -35,7 +36,7 @@ submit via `snakemake_mqsub`, the user starts big runs.
 - Midpoint rooting (`outgroup.enabled: false`); Asgard outgroup caused the PhyloRank crash.
 - Windows: best-covered window crossing an intron in <=5% of covering genomes (`max_span_fraction`); `naive` variant is a negative control, off by default.
 - Genomic data only for intron analysis; TSA transcripts are spliced, so intron status for them comes from genome relatives or is unknown.
-- Transcriptomes plan: bulk TSA files from the NCBI FTP (`genbank/tsa/<X>/tsa.<PREFIX>.<n>.fsa_nt.gz`), BUSCO transcriptome mode (MetaEuk), derep with galah on marker CDS.
+- Transcriptomes: only taxa no genome covers (genomes are trusted more); they go into the tree too (complete/partial taxonomy). BUSCO transcriptome mode (MetaEuk). Derep: galah on marker CDS, `ani: 97`, transcriptomes lose 50 completeness points so genomes win clusters.
 - Token rotation is handled by the user.
 
 ## Gotchas
@@ -48,7 +49,9 @@ submit via `snakemake_mqsub`, the user starts big runs.
 - Dry run of the full phase 2 takes ~2 minutes (exceeds the sandbox tool limit; run it in the background).
 - Two BUSCO versions are mixed in results (6.0.0: 5,286 genomes; 6.1.0: 3,645).
 - `.pixi/envs/notebook` lacks Biopython, so metapackage tests need the `default` env.
-- BUSCO transcriptome mode has no `Gene Start/End/Strand` columns, so `aggregate_busco_sequences.py` and `extract_busco_transcripts.py` need changes before TSA works.
+- BUSCO transcriptome mode has no `Gene Start/End/Strand` columns (Sequence = `contig:start-end`, strand only in FASTA headers); `scripts/busco_table.py` normalises both modes.
+- Running a BUSCO job from the tool shell with `nohup &` dies when the tool call times out; use `setsid nohup ... < /dev/null &`.
+- The tree reads `metapackage_workflow/outputs/singlem/input`, which only holds genomes with `complete`/`partial` taxonomy. The 263 `unresolved` p10k genomes therefore do NOT reach the tree (the Oct 27 decision 'make them tree targets' is only half done: they pass BUSCO but not aggregation).
 - NCBI needs an explicit CA bundle (`/etc/pki/tls/certs/ca-bundle.crt`) in the sandbox. OrthoDB returns 403 there.
 - The sandbox cannot see `/work/microbiome/users/n9985158/` (the user's conda envs).
 - Sandbox `/tmp/pbs.*/opencode` is the writable scratch space; its job id changes per session.

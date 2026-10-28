@@ -22,7 +22,7 @@ Two subworkflows, run separately (config lives in `metapackage_workflow/config/`
 
 ```bash
 cd metapackage_workflow
-pixi install --all   # once: the snakemake driver (default) + per-rule envs (singlem, graftm, busco, coverm, notebook)
+pixi install --all   # once: the snakemake driver (default) + per-rule envs (singlem, graftm, busco, galah, notebook)
 
 # phase 1: metadata + genome download (JGI / NCBI / P10K -> unified manifest)
 pixi run snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda \
@@ -60,6 +60,25 @@ Notes:
   for rules without wildcards. Logs are overwritten each time a job runs. The raw PBS
   `.OU`/`.ER` files still go to `~/qsub_logs` (check those for jobs killed before they
   wrote anything, e.g. out of memory).
+
+- **TSA transcriptomes.** NCBI Transcriptome Shotgun Assembly projects are added as group `tsa` (config `tsa:`).
+  `discover_tsa` (checkpoint, `scripts/discover_tsa.py`) queries Entrez for non-Metazoa/Viridiplantae `tsa-master`
+  records (lineage re-checked), drops taxa a genome already covers (`only_novel_taxa`, judged by species name or tax ID,
+  `novel_level`), looks up NCBI's bulk files (`genbank/tsa/<letter>/tsa.<PREFIX>.<n>.fsa_nt.gz`), keeps the largest
+  project per tax ID above `min_size_mb`, and writes `outputs/metadata/source/tsa/tsa_projects.tsv`.
+  `download_tsa` fetches the parts (Content-Length + gzip check; NCBI publishes no md5) into
+  `outputs/genomes/tsa/<master accession>.fasta.gz`. TSA enters the unified manifest, taxonomy fetch and
+  `tax_status` gate like any genome. The taxonomy mapping is read by path (it depends on this rule), so run
+  `--forcerun discover_tsa` after it changes. In phase 2 BUSCO runs in `transcriptome` mode for group `tsa`
+  (MetaEuk; its `full_table.tsv` has no `Gene Start/End/Strand`, handled by `scripts/busco_table.py`);
+  `extract_transcripts` writes the MetaEuk CDS (no introns to cut), and TSA is excluded from the intron survey.
+  TSA proteins reach the per-gene FASTAs, and so the tree, when their taxonomy is `complete` or `partial`.
+- **Dereplication** (`dereplicate_genomes`, used by the tree's `derep` mode and optionally the metapackage) runs
+  `galah cluster` (skani) on each genome's **marker CDS** (rule `extract_marker_cds`: spliced CDS of the Complete and
+  best Duplicated BUSCO genes), so genomes and transcriptomes compare on the same sequence. Marker-CDS ANI runs higher
+  than whole-genome ANI: `ani: 97` reproduces the old coverm 95% clusters (ARI 0.986 on 1,303 genomes; 590 vs 600
+  clusters). Transcriptomes lose `tsa_quality_penalty` completeness points in the quality report, so a genome is the
+  representative whenever one shares the cluster.
 
 - **JGI downloads.** Files on JGI tape (`PURGED`) must be restored by JGI first (up to ~24 h).
   `jgi_request_restore` sends one batched request per group; every missing genome then gets

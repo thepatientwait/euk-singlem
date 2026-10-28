@@ -14,15 +14,13 @@ Last updated: 2026-10-28. Mark items done (move to `HISTORY.md` with a line) rat
 
 ## Next to build
 
-5. **TSA transcriptomes** (not started; asked Oct 26, plan below).
-   - `scripts/discover_tsa.py` (checkpoint): non-Metazoa/Viridiplantae `tsa-master` records from `nuccore` (1,162 found in the sandbox notebook); option `tsa.only_novel_taxa` (default true, anti-join against `taxonomy_mapping`); one assembly per TaxID, size/contig filter. Code to reuse: `metapackage_workflow/sandbox.ipynb` cells 3-4.
-   - Rule `download_tsa`: bulk `https://ftp.ncbi.nlm.nih.gov/genbank/tsa/<X>/tsa.<PREFIX>.<n>.fsa_nt.gz`, concatenate, md5-check; output `outputs/genomes/tsa/{acc}.fasta.gz`; rate-limit resource like `jgi_api`.
-   - Add `tsa` as a source in `build_unified_manifest.py` so `fetch_ncbi_taxonomy.py` and the `tax_status` gate apply.
-   - Add `tsa` to `BUSCO_GROUPS`; `run_busco` uses transcriptome mode (MetaEuk) for it. Test on `metapackage_workflow/test/Coolia_malayensis_transcripts.fasta` (gitignored, 55 MB) first.
-   - `aggregate_busco_sequences.py` and `busco_results_quality_control.py` must cope with missing `Gene Start/End/Strand`; `extract_busco_transcripts.py` needs a transcript path (emit contig unchanged; no GFF).
-   - Intron status for TSA taxa: unknown (spliced); do not let them influence window choice.
-6. **Derep with galah on marker CDS** (asked Oct 26): new `build_marker_cds` rule (spliced CDS of Complete + chosen Duplicated BUSCOs per genome/transcriptome), then `galah cluster` replacing `dereplicate_genomes.py`. A galah 0.4.2/skani 0.2.2 install exists under `/mnt/weka/pkg/cmr/sw/conda/envs`. Whole-genome ANI is poor between transcriptome and genome.
-7. **Annotation workflow** (to define our own markers): confirm OrthoDB file names/URLs and sizes (403 from sandbox; user must test access), then gene calling (metaeuk vs EukProt, or eggNOG v7 OGs), `family5`-sized pilot (~200 genomes) checking the 129 BUSCO genes map to consistent OGs, then scale. Evaluation of eggNOG v7 euk coverage was not finished (`eggnog.db` timed out).
+5. **TSA transcriptomes** (branch `transcripts`; code done, runs pending).
+   - Run phase 1 (`download_data.smk`, no `--config` change needed; TSA is `tsa.enabled: true`): downloads 377 projects (~7 GB), regenerates the unified manifest, taxonomy and genome manifest. Then phase 2 runs BUSCO transcriptome mode on them.
+   - Check after the first TSA BUSCO runs: completeness distribution, contamination/isoform redundancy (QC does not filter yet), and how many TSA taxa get `partial` or `unresolved` taxonomy.
+   - Flag TSA tips in the tree metadata/notebooks (not done): the notebooks do not read the BUSCO `group`, so TSA tips are not reported separately.
+   - Intron status for TSA taxa is unknown by design (excluded from `intron_window`).
+6. **Derep with galah on marker CDS** (done, branch `transcripts`; full run pending). Rerun the validation on the full set after phase 2 (compare with `genome_clusters.tsv`, tune `ani` 97 and `min_aligned_fraction` 15). `enabled: false` still means the metapackage is not built from representatives; the tree's `derep` mode uses them.
+7. **Annotation workflow** (branch `annotation`; REMINDER: the user asked to finish the OrthoDB annotation change): confirm OrthoDB file names/URLs and sizes (403 from sandbox; user must test access), then gene calling (metaeuk vs EukProt, or eggNOG v7 OGs), `family5`-sized pilot (~200 genomes) checking the 129 BUSCO genes map to consistent OGs, then scale. Evaluation of eggNOG v7 euk coverage was not finished (`eggnog.db` timed out).
 8. Per-genome parsing speed-up for the 39k-genome intron survey (not done).
 9. Test whether the window-coordinate bug (`HISTORY.md` section 8) affected recovery of existing packages (not tested).
 
@@ -33,6 +31,9 @@ Last updated: 2026-10-28. Mark items done (move to `HISTORY.md` with a line) rat
 12. Polyphyletic clade splitting: shelved; revisit only after labels/contamination are fixed.
 
 ## Housekeeping
+
+0. Merge `transcripts` and `annotation` branches into `feature/v2-ncbi-hybrid` when done.
+0b. Decision 4 (unresolved p10k as tree targets) is not effective: the tree reads taxonomy-gated per-gene FASTAs. Needs a separate ungated aggregation for the tree if wanted.
 
 13. Regenerate or retire `taxonomy_mapping.tsv`-dependent tree outputs (tree side still on the old schema until rerun).
 14. Simplify the regex re-parse of assign output strings in `tree_workflow/scripts/generate_tree_metadata.py`.

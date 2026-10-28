@@ -2,7 +2,7 @@
 
 Use this to find code without searching. Commands and config details are in `README.md`; state in `MEMORY.md`;
 open work in `TODO.md`. Paths are relative to the repo root. Tests are `unittest`-style: run
-`<workflow>/.pixi/envs/default/bin/python -m unittest discover -s tests -q` (metapackage default env has Biopython/polars).
+`<workflow>/.pixi/envs/default/bin/python -m unittest discover -s tests -q` (metapackage default env has Biopython/polars). Tree tests need two envs: `default` (alignment, diagnostics, accuracy; no dendropy) and `taxonomy` (assign_taxonomy, label masking, monotone RED; no Biopython); each errors only on the other's modules.
 
 ## Data flow
 
@@ -22,16 +22,16 @@ JGI / NCBI / P10K  --download_data.smk-->  outputs/genomes/{fungi,algae,ncbi,p10
 | Path | What |
 |---|---|
 | `snakefile` | Orchestrator: runs phase 1 then phase 2 as nested snakemake calls; done-flags in `outputs/orchestration/*.done` (delete a flag to force a phase) |
-| `subworkflows/download_data.smk` | Phase 1. Rules: `download_jgi_metadata`, `jgi_request_restore`, `download_jgi_genome`, `download_p10k_metadata`, `discover_ncbi_genomes`, `build_unified_manifest`, `download_ncbi_genome`, `fetch_ncbi_taxonomy`, `cleanup_failed_genomes`, `write_genome_manifest`. `onsuccess/onerror` print the download summary |
-| `subworkflows/generate_metapackage.smk` | Phase 2 (~25 rules): `run_busco`, `busco_results_quality_control`, `dereplicate_genomes`, `aggregate_busco_sequences`, `graftm_create`, `intron_window`, `window_intron_summary`, `intron_survey_notebook`, `singlem_create`, off-target rules, `create_draft_metapackage`, `extract_transcripts`, `eukaryotic_transcripts`, `aggregate_transcript_taxonomy`, `make_nucleotide_sdb`, `create_final_metapackage` |
+| `subworkflows/download_data.smk` | Phase 1. Rules: `download_jgi_metadata`, `jgi_request_restore`, `download_jgi_genome`, `download_p10k_metadata`, `discover_ncbi_genomes`, `build_unified_manifest`, `download_ncbi_genome`, `fetch_ncbi_taxonomy`, `cleanup_failed_genomes`, `write_genome_manifest`, plus `discover_tsa` (checkpoint) and `download_tsa` (NCBI TSA transcriptomes). `onsuccess/onerror` print the download summary |
+| `subworkflows/generate_metapackage.smk` | Phase 2 (~25 rules): `run_busco`, `busco_results_quality_control`, `extract_marker_cds`, `dereplicate_genomes` (galah on marker CDS), `aggregate_busco_sequences`, `graftm_create`, `intron_window`, `window_intron_summary`, `intron_survey_notebook`, `singlem_create`, off-target rules, `create_draft_metapackage`, `extract_transcripts`, `eukaryotic_transcripts`, `aggregate_transcript_taxonomy`, `make_nucleotide_sdb`, `create_final_metapackage` |
 | `config/config.yaml` | Behaviour (multicopy: `busco.quality_control.multi_copy_selection`/`multi_copy_min_gain`, `singlem.introns.*`, BUSCO, derep, download limits). `paths.yaml` = every output path. `secrets.yaml` = JGI token (gitignored). `dryrun.yaml` |
 | `helpers.py` | Config/paths loading, DAG filters (skip PURGED, present genomes), `get_genomes_with_transcripts_factory`, bool parsing of `--config` overrides |
 | `scripts/` | One script per rule. Key ones below |
 | `notebooks/` | `build_intron_survey.py` generates `intron_survey.ipynb`; executed copies in `notebooks/rendered/` (gitignored) |
 | `snapshots/intron_survey/` | Frozen survey results (gitignored); `scripts/snapshot_intron_survey.py create/compare/render` |
-| `tests/` | downloads, taxonomy, multicopy, peer copy selection, introns, transcripts, snapshot |
+| `tests/` | downloads, taxonomy, multicopy, peer copy selection, introns, transcripts, snapshot, tsa (discovery, download filter, transcriptome BUSCO tables, marker CDS, quality penalty) |
 | `OUTPUT_LAYOUT.md` | Output directory map (partly pre-`{introns}`) |
-| `sandbox.ipynb` | Scratch; holds the only TSA transcriptome discovery code (cells 3-4). `nuccore_tsa_metadata.tsv` = its output |
+| `sandbox.ipynb` | Scratch; its TSA discovery cells were ported to `scripts/discover_tsa.py`. `nuccore_tsa_metadata.tsv` = old output |
 
 Key scripts: `fetch_ncbi_taxonomy.py` (single taxonomy path, `tax_status`), `build_unified_manifest.py`,
 `download_genome.py` / `download_jgi_genome.py` / `jgi_request_restore.py` / `jgi_common.py`,
@@ -39,9 +39,9 @@ Key scripts: `fetch_ncbi_taxonomy.py` (single taxonomy path, `tax_status`), `bui
 (strips `*`, top-scoring or peer copy, `<gene>_status.tsv` sidecar), `peer_copy_selection.py`,
 `intron_utils.py` + `intron_window.py` + `window_intron_summary.py` (intron-aware windows),
 `extract_busco_transcripts.py` (exon blocks), `subset_busco_manifest.py` (subset mode), `run_notebook.py`,
-`dereplicate_genomes.py` (CoverM/galah on whole genomes), `log_config.py` (per-rule logging).
+`discover_tsa.py` + `download_tsa.py` (TSA transcriptomes), `busco_table.py` (genome- and transcriptome-mode full tables with one column set), `extract_marker_cds.py` (spliced marker CDS per genome), `dereplicate_genomes.py` (galah/skani on marker CDS), `build_checkm2_quality_report.py` (BUSCO completeness, TSA penalty), `log_config.py` (per-rule logging).
 
-Output layout (under `outputs/`, gitignored): `genomes/<group>/`, `metadata/{source,manifests,taxonomy,qc,reports}/`,
+Output layout (under `outputs/`, gitignored): `genomes/<group>/` (groups fungi, algae, p10k, ncbi, tsa), `derep/marker_cds/<group>/`, `metadata/source/tsa/tsa_projects.tsv`, `metadata/{source,manifests,taxonomy,qc,reports}/`,
 `busco/<group>/<acc>/`, `singlem/{input,genome_input,packages,metapackages,introns,off_target}/`,
 `transcripts/<introns>/{extracted,...}`, `subset_<name>/` (subset runs), `orchestration/`.
 The `{introns}` wildcard (`corrected` | `naive`) is in package, metapackage and transcript paths.
@@ -78,6 +78,7 @@ Separate nested git repo (gitignored here). Early stage; `plan.md` holds the exp
 - Environments: pixi per workflow (`pixi.toml`), rules use `conda: env("<name>")` -> `.pixi/envs/<name>`.
 - Logs: every rule writes `logs/<rule>/<wildcards>.log`.
 - Re-running: use `--rerun-triggers mtime` (or the orchestrator's `DOWNLOAD_FLAGS`) so code edits do not rerun BUSCO.
+- galah's tool check calls `which -- <tool>`; RHEL's exported `which` bash function rejects `--`. `unset -f which` (or use the pixi `galah` env on the compute nodes) when running galah by hand.
 - Heavy runs go to the batch queue (`mqsub` / `snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua`); the sandbox cannot submit via `snakemake_mqsub`.
 - Never rewrite reference database taxonomy names (asserted in `assign_taxonomy`).
 - Docs to keep fresh: `MEMORY.md` (state/decisions), `HISTORY.md` (append per session), `TODO.md`, this file.
