@@ -82,6 +82,7 @@ def _build_busco_targets_cached(
 def _get_genomes_with_transcripts_cached(
     manifest_file: str,
     signature: Tuple[bool, int, int],
+    template: str,
 ) -> List[str]:
     path = Path(manifest_file)
 
@@ -96,7 +97,7 @@ def _get_genomes_with_transcripts_cached(
     unique_pairs = manifest_df.select(["group", "genome_acc"]).unique()
     return sorted(
         [
-            f"outputs/transcripts/taxonomy/{row['group']}/{row['genome_acc']}.otu_table.tsv"
+            template.format(group=row['group'], genome_acc=row['genome_acc'])
             for row in unique_pairs.iter_rows(named=True)
         ]
     )
@@ -509,10 +510,36 @@ def build_busco_targets_from_manifest(manifest_path: str) -> Callable:
     return _build_busco_targets
 
 
-def get_genomes_with_transcripts_factory(manifest_file: str) -> Callable:
+def _genomes_in_manifest(manifest_path: str) -> Optional[set]:
+    """{(group, genome_acc)} of the genome manifest (None if it does not exist yet)."""
+    path = Path(manifest_path)
+    if not path.exists():
+        return None
+    return {genome_path_to_group_genome_acc(p) for p in read_genome_manifest_nls(str(path))}
+
+
+def get_genomes_with_transcripts_factory(manifest_file: str, template: str,
+                                         genome_manifest: Optional[str] = None) -> Callable:
+    """Per-genome taxonomy tables for the genomes of a QC manifest.
+
+    ``template`` has ``{group}``, ``{genome_acc}`` and optionally ``{introns}`` (filled from the wildcards).
+
+    A QC manifest is only rewritten once the BUSCO results change, so after genomes are removed
+    (orphans, failed downloads) it can still list genomes that have no file any more; their
+    transcript jobs would fail with a missing genome. With ``genome_manifest`` (the current list of
+    genomes to process) only genomes in both are used.
+    """
     def _get_genomes_with_transcripts(wildcards):
         path = Path(manifest_file)
-        return _get_genomes_with_transcripts_cached(str(path), _file_signature(path))
+        filled = template.replace("{introns}", getattr(wildcards, "introns", "{introns}"))
+        targets = _get_genomes_with_transcripts_cached(str(path), _file_signature(path), filled)
+        if genome_manifest is None:
+            return targets
+        current = _genomes_in_manifest(genome_manifest)
+        if current is None:
+            return targets
+        wanted = {filled.format(group=g, genome_acc=a) for g, a in current}
+        return [t for t in targets if t in wanted]
 
     return _get_genomes_with_transcripts
 
@@ -530,11 +557,14 @@ def get_discovered_busco_genes(
 
 def collect_final_packages_factory(
     checkpoint_getter: Optional[Callable] = None,
-    final_packages_dir: str = "outputs/singlem/packages/final",
+    package_template: str = "outputs/singlem/packages/{introns}/final/{busco_gene}.spkg",
+    input_dir: str = "outputs/singlem/input",
 ) -> Callable:
+    """Package paths for every discovered gene; ``{introns}`` is filled from the job's wildcards."""
     def _collect_final_packages(wildcards):
-        busco_genes = get_discovered_busco_genes(checkpoint_getter=checkpoint_getter)
-        return [f"{final_packages_dir}/{busco_gene}.spkg" for busco_gene in busco_genes]
+        busco_genes = get_discovered_busco_genes(checkpoint_getter=checkpoint_getter, singlem_input_dir=input_dir)
+        introns = getattr(wildcards, "introns", "{introns}")
+        return [package_template.format(introns=introns, busco_gene=busco_gene) for busco_gene in busco_genes]
 
     return _collect_final_packages
 

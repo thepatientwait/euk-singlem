@@ -90,7 +90,7 @@ generate:
         sequences: "outputs/singlem/off_target/prepared/{busco_gene}.faa"
         taxonomy: "outputs/singlem/off_target/prepared/{busco_gene}_taxonomy.tsv"
       regenerate:
-        spkg: "outputs/singlem/packages/regenerated/{busco_gene}.spkg"
+        spkg: "outputs/singlem/packages/{introns}/regenerated/{busco_gene}.spkg"
     gene_input:
       sequences_dir: "outputs/singlem/input"
       gene:
@@ -102,28 +102,38 @@ generate:
       hmms_and_names: "outputs/singlem/genome_input/hmms_and_names_busco.tsv"
       genome_taxonomy: "outputs/singlem/genome_input/genome_taxonomy.tsv"
     windows:
-      positions: "outputs/singlem/packages/windows/{busco_gene}.window_position.txt"
+      # rule intron_window writes one window per intron variant (naive = best-covered window, ignoring
+      # introns; corrected = best-covered window that crosses introns in few genomes)
+      positions: "outputs/singlem/introns/{busco_gene}.window_position.{introns}.txt"
+      introns: "outputs/singlem/introns/{busco_gene}.introns.tsv"
+      genomes: "outputs/singlem/introns/{busco_gene}.genomes.tsv"
+      scan: "outputs/singlem/introns/{busco_gene}.window_scan.tsv"
+      choice: "outputs/singlem/introns/{busco_gene}.window_choice.tsv"
+      summary: "outputs/metadata/reports/window_intron_summary.tsv"
+      notebook: "notebooks/rendered/intron_survey.ipynb"
     packages:
-      initial_spkg: "outputs/singlem/packages/initial/{busco_gene}.spkg"
-      final_spkg: "outputs/singlem/packages/final/{busco_gene}.spkg"
-      regenerated_spkg: "outputs/singlem/packages/regenerated/{busco_gene}.spkg"
+      initial_spkg: "outputs/singlem/packages/{introns}/initial/{busco_gene}.spkg"
+      final_spkg: "outputs/singlem/packages/{introns}/final/{busco_gene}.spkg"
+      regenerated_spkg: "outputs/singlem/packages/{introns}/regenerated/{busco_gene}.spkg"
     metapackages:
-      draft: "outputs/singlem/metapackages/draft.smpkg"
-      final: "outputs/singlem/metapackages/final.smpkg"
-      valid_packages_manifest: "outputs/metadata/qc/valid_singlem_packages.txt"
-      invalid_packages_report: "outputs/metadata/reports/invalid_singlem_packages.tsv"
+      draft: "outputs/singlem/metapackages/{introns}/draft.smpkg"
+      final: "outputs/singlem/metapackages/{introns}/final.smpkg"
+      valid_packages_manifest: "outputs/metadata/qc/valid_singlem_packages.{introns}.txt"
+      invalid_packages_report: "outputs/metadata/reports/invalid_singlem_packages.{introns}.tsv"
 
   graftm:
     package: "outputs/singlem/packages/graftm/{busco_gene}.gpkg"
     alignment: "outputs/singlem/packages/graftm/{busco_gene}.gpkg/{busco_gene}.gpkg.refpkg/{busco_gene}_deduplicated_aligned.fasta"
 
   transcripts:
-    extracted: "outputs/transcripts/extracted/{group}/{genome_acc}.fasta"
-    singlem_otu: "outputs/transcripts/singlem/{group}/{genome_acc}.otu_table.tsv"
-    taxonomy_otu: "outputs/transcripts/taxonomy/{group}/{genome_acc}.otu_table.tsv"
+    # per intron variant. corrected: intron-free BUSCO gene blocks (one record per exon block);
+    # naive: the whole gene span of each BUSCO hit, introns included
+    extracted: "outputs/transcripts/{introns}/extracted/{group}/{genome_acc}.fasta"
+    singlem_otu: "outputs/transcripts/{introns}/singlem/{group}/{genome_acc}.otu_table.tsv"
+    taxonomy_otu: "outputs/transcripts/{introns}/taxonomy/{group}/{genome_acc}.otu_table.tsv"
     aggregate:
-      combined_otu: "outputs/transcripts/aggregate/transcripts.otu_table.tsv"
-      sdb: "outputs/transcripts/aggregate/transcripts.sdb"
+      combined_otu: "outputs/transcripts/{introns}/aggregate/transcripts.otu_table.tsv"
+      sdb: "outputs/transcripts/{introns}/aggregate/transcripts.sdb"
 
 common:
   busco_hmm:

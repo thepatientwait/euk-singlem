@@ -1,217 +1,175 @@
 #!/usr/bin/env python3
 
 """
-Extract transcript nucleotide sequences from genome using BUSCO coordinates.
-BUSCO outputs protein sequences but we need nucleotide transcripts for SingleM.
+Extract nucleotide sequences of a genome's complete BUSCO genes (mode ``exon_blocks`` or ``gene_span``).
+
+These sequences are searched with ``singlem pipe`` to build the nucleotide database of the
+metapackage, which is later queried with metagenomic *DNA* reads. A read cannot cross an intron,
+so a window that spans one is never observed in reads. Two modes (wildcard ``introns``):
+
+* ``exon_blocks`` (corrected): the genes are cut at every intron (using the exon structure of the
+  miniprot gene model BUSCO writes next to each hit) and each intron-free block is written as its
+  own record; no ORF, and so no window, can bridge two exons;
+* ``gene_span`` (naive): the whole genomic span of each BUSCO hit, introns included, as one record.
+
+Exons separated by less than ``min_intron`` nt are frameshift/indel artefacts rather than
+introns and stay together. Blocks shorter than ``min_exon_nt`` cannot hold a window and are
+dropped.
 """
 
-import sys
 import gzip
-import os
+import sys
 from pathlib import Path
+from typing import Dict, Optional, Tuple
+
+import polars as pl
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from typing import Tuple
-import polars as pl
 
-# Import the logging configuration
 sys.path.append(str(Path(__file__).parent))
 from log_config import configure_logger
+import intron_utils as iu
 
-# Configure logger
 logger = configure_logger(__file__)
+
+DEFAULT_MIN_EXON_NT = 60
 
 
 def parse_busco_file(busco_file: Path) -> Tuple[str, str, pl.DataFrame]:
+    """Group, genome accession and the Complete rows of a BUSCO ``full_table.tsv``.
+
+    Path format: outputs/busco/{group}/{genome_acc}/run_eukaryota_odb12/full_table.tsv
     """
-    Parse a BUSCO results file and extract group, genome_acc, and complete genes.
-    
-    Args:
-        busco_file: Path to BUSCO full_table.tsv file
-        
-    Returns:
-        Tuple of (group, genome_acc, complete_genes_dataframe)
-    """
-    # Extract group and genome accession from path.
-    # Path format: outputs/busco/{group}/{genome_acc}/run_eukaryota_odb12/full_table.tsv
-    path_parts = busco_file.parts
-    group = path_parts[-4]
-    genome_acc = path_parts[-3]
-    
+    group = busco_file.parts[-4]
+    genome_acc = busco_file.parts[-3]
     logger.info(f"Parsing BUSCO file for {group}/{genome_acc}")
-    
-    # Read BUSCO full table, skipping comment lines that start with #
     busco_df = pl.read_csv(busco_file, separator='\t', skip_rows=2).rename({'# Busco id': 'Busco id'})
-    
-    # Filter for complete single-copy genes using the correct column name
     complete_genes = busco_df.filter(pl.col('Status') == 'Complete')
-    
     logger.info(f"Found {len(complete_genes)} complete genes for {group}/{genome_acc}")
     return group, genome_acc, complete_genes
 
 
-def load_genome_sequences(genome_file):
-    """
-    Load genome sequences from FASTA file.
-    
-    Args:
-        genome_file: Path to genome FASTA file (may be gzipped)
-        
-    Returns:
-        dict: Sequence dictionary {seq_id: seq_record}
-    """
-    sequences = {}
-    
-    try:
-        if genome_file.endswith('.gz'):
-            with gzip.open(genome_file, 'rt') as f:
-                for record in SeqIO.parse(f, 'fasta'):
-                    sequences[record.id] = record
-        else:
-            for record in SeqIO.parse(genome_file, 'fasta'):
-                sequences[record.id] = record
-                
-        logger.info(f"Loaded {len(sequences)} sequences from {genome_file}")
-        
-    except Exception as e:
-        logger.error(f"Error loading genome file {genome_file}: {e}")
-        raise
-        
+def load_genome_sequences(genome_file) -> Dict[str, SeqRecord]:
+    """Genome FASTA (optionally gzipped) as ``{contig: record}``."""
+    genome_file = str(genome_file)
+    opener = gzip.open if genome_file.endswith('.gz') else open
+    with opener(genome_file, 'rt') as handle:
+        sequences = {record.id: record for record in SeqIO.parse(handle, 'fasta')}
+    logger.info(f"Loaded {len(sequences)} sequences from {genome_file}")
     return sequences
 
 
-def extract_transcript_sequence(genome_sequences, seqid, start, end, strand, gene_id):
-    """
-    Extract transcript sequence from genome.
-    
-    Args:
-        genome_sequences: Dictionary of genome sequences
-        seqid: Sequence/contig identifier
-        start: Start coordinate (1-based)
-        end: End coordinate (1-based)
-        strand: Strand ('+' or '-')
-        gene_id: Gene identifier
-        
-    Returns:
-        SeqRecord: Transcript sequence record
-    """
-    if seqid not in genome_sequences:
-        logger.warning(f"Sequence {seqid} not found in genome for gene {gene_id}")
+def extract_segment(contig: SeqRecord, start: int, end: int, strand: str) -> Optional[Seq]:
+    """Bases ``start..end`` (1-based, inclusive) of a contig in the gene's orientation."""
+    if start < 1 or end > len(contig.seq):
         return None
-        
-    genome_seq = genome_sequences[seqid]
-    genome_len = len(genome_seq.seq)
+    seq = contig.seq[start - 1:end]
+    return seq.reverse_complement() if strand == '-' else seq
 
-    # BUSCO reports 1-based inclusive coordinates.
-    left = min(start, end)
-    right = max(start, end)
 
-    if left < 1 or right > genome_len:
-        logger.warning(
-            f"Coordinates out of bounds for gene {gene_id} on {seqid}: "
-            f"{start}-{end} (normalized {left}-{right}, contig length {genome_len})"
-        )
+def gene_records(busco_id: str, model: iu.Model, genome: Dict[str, SeqRecord], min_intron: int, min_exon_nt: int):
+    """Intron-free records of one gene: ``(records, n_introns, n_short_dropped)``."""
+    contig = genome.get(model.contig)
+    if contig is None:
+        logger.warning(f"Contig {model.contig} not found in genome for {busco_id}")
+        return [], 0, 0
+    segments = iu.exon_segments(model, min_intron)
+    records, short = [], 0
+    for index, (start, end) in enumerate(segments, start=1):
+        seq = extract_segment(contig, start, end, model.strand)
+        if seq is None:
+            logger.warning(f"Coordinates out of bounds for {busco_id} on {model.contig}: {start}-{end}")
+            continue
+        if len(seq) < min_exon_nt:
+            short += 1
+            continue
+        records.append(SeqRecord(
+            seq,
+            id=f"{busco_id}|exon{index}of{len(segments)}",
+            description=f"{model.contig}:{start}-{end} strand {model.strand}",
+        ))
+    return records, len(segments) - 1, short
+
+
+def gene_span_record(busco_id: str, row: dict, genome: Dict[str, SeqRecord]) -> Optional[SeqRecord]:
+    """The whole genomic span (introns included) of one BUSCO hit, in the gene's orientation."""
+    contig = genome.get(str(row['Sequence']))
+    if contig is None:
         return None
-
-    # Convert 1-based inclusive -> Python 0-based end-exclusive.
-    transcript_seq = genome_seq.seq[left - 1:right]
-
-    # Return transcript in biological orientation.
-    if strand == '-':
-        transcript_seq = transcript_seq.reverse_complement()
-    
-    # Create transcript record
-    transcript_record = SeqRecord(
-        transcript_seq,
-        id=gene_id,
-        description=(
-            f"BUSCO transcript {gene_id} from {seqid}:{start}-{end} strand {strand} "
-            f"(normalized interval {left}-{right})"
-        )
-    )
-    
-    return transcript_record
+    start, end = int(row['Gene Start']), int(row['Gene End'])
+    lo, hi = min(start, end), max(start, end)
+    seq = extract_segment(contig, lo, hi, str(row['Strand']))
+    if seq is None:
+        return None
+    return SeqRecord(seq, id=busco_id, description=f"{row['Sequence']}:{lo}-{hi} strand {row['Strand']} (gene span)")
 
 
-def extract_busco_transcripts(genome_file, full_table_file, output_file):
-    """
-    Main function to extract BUSCO transcript sequences.
-    
-    Args:
-        genome_file: Path to genome FASTA file
-        full_table_file: Path to BUSCO full_table.tsv file
-        output_file: Path to output transcript FASTA file
-    """
-    logger.info(f"Extracting transcripts from {genome_file}")
-    logger.info(f"Using BUSCO full table: {full_table_file}")
-    
-    # Load genome sequences
-    genome_sequences = load_genome_sequences(genome_file)
-    
-    # Parse BUSCO full table using polars
-    group, genome_acc, complete_genes = parse_busco_file(Path(full_table_file))
-    logger.info(f"Processing {group}/{genome_acc} with {len(complete_genes)} complete BUSCO genes")
-    
-    if len(complete_genes) == 0:
-        logger.warning("No complete BUSCO genes found in full table")
-        # Create empty output file
-        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-        Path(output_file).touch()
-        return 0
-    
-    transcript_records = []
-    genes_processed = 0
-    genes_found = 0
-    
-    # Extract transcript sequences for each gene
-    for row in complete_genes.iter_rows(named=True):
-        genes_processed += 1
-        
-        busco_id = str(row['Busco id'])
-        sequence = str(row['Sequence'])
-        start = int(row['Gene Start'])
-        end = int(row['Gene End'])
-        strand = str(row['Strand'])
-        
-        transcript_record = extract_transcript_sequence(
-            genome_sequences, sequence, start, end, strand, busco_id
-        )
-        
-        if transcript_record:
-            transcript_records.append(transcript_record)
-            genes_found += 1
-        
-    logger.info(f"Processed {genes_processed} genes, extracted {genes_found} transcripts")
-    
-    # Write transcript sequences
+def extract_busco_transcripts(genome_file, full_table_file, output_file,
+                              min_intron: int = iu.DEFAULT_MIN_INTRON,
+                              min_exon_nt: int = DEFAULT_MIN_EXON_NT,
+                              mode: str = "exon_blocks") -> int:
+    """Write the sequences of every Complete BUSCO gene (see module doc for ``mode``); returns the record count."""
+    if mode not in ("exon_blocks", "gene_span"):
+        raise ValueError(f"unknown mode {mode!r}")
+    full_table = Path(full_table_file)
+    group, genome_acc, complete_genes = parse_busco_file(full_table)
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    with open(output_file, 'w') as f:
-        SeqIO.write(transcript_records, f, 'fasta')
-    
-    logger.info(f"Wrote {len(transcript_records)} transcript sequences to {output_file}")
-    
-    return len(transcript_records)
+
+    if len(complete_genes) == 0:
+        logger.warning("No complete BUSCO genes found in full table")
+        output_path.touch()
+        return 0
+
+    genome = load_genome_sequences(genome_file)
+    gff_dir = full_table.parent / "busco_sequences" / "single_copy_busco_sequences"
+    records, no_model, with_introns, short_total = [], 0, 0, 0
+
+    for row in complete_genes.iter_rows(named=True):
+        busco_id = str(row['Busco id'])
+        if mode == "gene_span":
+            record = gene_span_record(busco_id, row, genome)
+            if record is None:
+                no_model += 1
+            else:
+                records.append(record)
+            continue
+        gff = gff_dir / f"{busco_id}.gff"
+        models = iu.parse_gff(gff) if gff.exists() else []
+        model = iu.select_model(models, str(row['Sequence']), int(row['Gene Start']), int(row['Gene End']),
+                                str(row['Strand'])) or (models[0] if len(models) == 1 else None)
+        if model is None:
+            no_model += 1
+            continue
+        gene_recs, n_introns, short = gene_records(busco_id, model, genome, min_intron, min_exon_nt)
+        records.extend(gene_recs)
+        with_introns += n_introns > 0
+        short_total += short
+
+    if no_model:
+        logger.warning(f"{no_model} of {len(complete_genes)} complete genes had no usable gene model "
+                       f"(GFF missing or not matching the table) and were skipped")
+    logger.info(f"{group}/{genome_acc}: {len(complete_genes)} complete genes, {with_introns} with introns, "
+                f"{len(records)} intron-free records written, {short_total} blocks shorter than {min_exon_nt} nt dropped")
+
+    with open(output_path, 'w') as handle:
+        SeqIO.write(records, handle, 'fasta')
+    return len(records)
 
 
 def main():
-    """Main function using snakemake inputs."""
-    genome_file = snakemake.input.genome
-    full_table_file = snakemake.input.full_table
-    output_file = snakemake.output.transcripts
-    
+    """Entry point when run by Snakemake."""
     try:
-        transcript_count = extract_busco_transcripts(genome_file, full_table_file, output_file)
-        
-        if transcript_count == 0:
-            logger.warning("No transcripts extracted")
-            # Create empty file to satisfy snakemake
-            Path(output_file).touch()
-        
-        logger.info(f"Successfully extracted {transcript_count} transcripts")
-        
+        count = extract_busco_transcripts(
+            snakemake.input.genome, snakemake.input.full_table, snakemake.output.transcripts,
+            min_intron=int(snakemake.params.get('min_intron', iu.DEFAULT_MIN_INTRON)),
+            min_exon_nt=int(snakemake.params.get('min_exon_nt', DEFAULT_MIN_EXON_NT)),
+            mode=str(snakemake.params.get('mode', 'exon_blocks')),
+        )
+        if count == 0:
+            logger.warning("No sequences extracted")
+            Path(snakemake.output.transcripts).touch()
     except Exception as e:
         logger.error(f"Error extracting transcripts: {e}")
         raise

@@ -72,7 +72,7 @@ def parse_busco_file(busco_file: Path, use_multi_copy: bool,
         .sort(sort_columns,
               descending=[False, True] + ([True] if 'Length' in busco_df.columns else []) + [False, False],
               nulls_last=True)
-        .unique(subset=['Busco id'], keep='first', maintain_order=True)
+    )
     if keep_all_copies:
         # copies of a gene arrive best-first; keep the first few of each
         selected_genes = selected_genes.filter(
@@ -80,7 +80,6 @@ def parse_busco_file(busco_file: Path, use_multi_copy: bool,
         )
     else:
         selected_genes = selected_genes.unique(subset=['Busco id'], keep='first', maintain_order=True)
-    )
 
     logger.info(f"Selected {len(selected_genes)} BUSCO genes (top hit each) for {group}/{genome_acc}")
     return group, genome_acc, selected_genes
@@ -134,7 +133,8 @@ def extract_gene_sequences(busco_file: Path, selected_genes: pl.DataFrame,
                 continue
 
             used_record_ids.add(record.id)
-            sequence = f">{record.description}\n{record.seq}"
+            protein = clean_protein(str(record.seq))
+            sequence = f">{record.description}\n{protein}"
             sequence_id = f"{genome_acc}|{busco_id}|{copy_number}"
             gene_data[sequence_id] = {
                 'sequence': sequence,
@@ -145,12 +145,24 @@ def extract_gene_sequences(busco_file: Path, selected_genes: pl.DataFrame,
                 'copy_number': copy_number,
                 'score': row['Score'],
                 'status': row.get('Status', 'Complete'),
-                'length': len(record.seq),
+                'length': len(protein),
             }
             sequences_found += 1
     
     logger.info(f"Extracted {sequences_found} gene sequences for {group}/{genome_acc}")
     return gene_data
+
+
+def clean_protein(seq: str) -> str:
+    """Protein without stop symbols.
+
+    BUSCO proteins contain ``*``. ``graftM create --hmm`` (unlike its mafft path) does not strip them;
+    ``hmmalign`` writes them in upper case, GraftM only removes lower-case insert columns, and the columns
+    holding a ``*`` survive as nearly empty extra columns (later rewritten to ``X``). The aligned FASTA is then
+    wider than the HMM and ``singlem seqs`` positions no longer match HMM match columns. Removing ``*`` here keeps
+    every downstream file (gene FASTAs, genome-input FASTAs) free of them.
+    """
+    return seq.replace('*', '')
 
 
 def _match_busco_record(records, row: Dict, used_record_ids: set):
@@ -670,6 +682,12 @@ def main():
     output_dir = Path(snakemake.output.sequences_dir)
     taxonomy_file = snakemake.input.taxonomy
     use_multi_copy = snakemake.params.get('use_multi_copy', False)
+    # How one copy is chosen for a Duplicated gene: 'top_score' (best BUSCO score) or 'peer'
+    # (highest mean identity to Complete copies from the same taxon, see peer_copy_selection.py)
+    copy_selection = str(snakemake.params.get('multi_copy_selection', 'top_score'))
+    if copy_selection not in ('top_score', 'peer'):
+        raise ValueError(f"multi_copy_selection must be 'top_score' or 'peer', not {copy_selection!r}")
+    peer_selection = use_multi_copy and copy_selection == 'peer'
     allow_missing_taxonomy = bool(snakemake.params.get('allow_missing_taxonomy', False))
     if allow_missing_taxonomy:
         logger.info("allow_missing_taxonomy enabled: keeping sequences/genomes without taxonomy")
@@ -682,12 +700,6 @@ def main():
         raise ValueError(f"Manifest missing 'busco_result' column: {manifest_file}")
 
     busco_results = sorted(manifest_df['busco_result'].to_list())
-    # How one copy is chosen for a Duplicated gene: 'top_score' (best BUSCO score) or 'peer'
-    # (highest mean identity to Complete copies from the same taxon, see peer_copy_selection.py)
-    copy_selection = str(snakemake.params.get('multi_copy_selection', 'top_score'))
-    if copy_selection not in ('top_score', 'peer'):
-        raise ValueError(f"multi_copy_selection must be 'top_score' or 'peer', not {copy_selection!r}")
-    peer_selection = use_multi_copy and copy_selection == 'peer'
     
     # Validate inputs exist
     if not busco_results:
@@ -699,6 +711,7 @@ def main():
     # Create output directory. Files of genes/genomes from earlier runs would otherwise stay
     # behind and be picked up by later steps, so start from an empty set of aggregated files.
     output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "multicopy_selection.tsv").unlink(missing_ok=True)
     for stale in list(output_dir.glob("*.faa")) + list(output_dir.glob("*_taxonomy.tsv")) + list(output_dir.glob("*_status.tsv")):
         stale.unlink()
     genome_input_dir_early = Path(snakemake.output.genome_input_genomes).parent
@@ -711,7 +724,6 @@ def main():
     usable_taxonomy = load_usable_taxonomy(taxonomy_df)
     logger.info(f"Loaded taxonomy mapping with {len(taxonomy_df)} entries "
                 f"({len(usable_taxonomy)} with usable taxonomy)")
-    (output_dir / "multicopy_selection.tsv").unlink(missing_ok=True)
     
     # Process all BUSCO results - let errors bubble up
     gene_sequences = process_all_busco_results(busco_results, use_multi_copy, keep_all_copies=peer_selection)
@@ -720,18 +732,6 @@ def main():
     if not gene_sequences:
         raise RuntimeError("No gene sequences were successfully processed from any BUSCO files")
     
-    # Write traditional gene-centric files (for backward compatibility)
-    processed_genes = write_gene_files(
-        gene_sequences, usable_taxonomy, output_dir,
-        allow_missing_taxonomy=allow_missing_taxonomy,
-    )
-    
-    # Reorganize for singlem genome-input workflow format
-    min_sequences_per_gene = snakemake.params.get('min_sequences_per_gene', 5)
-    genome_input_dir = Path(snakemake.output.genome_input_genomes).parent
-    processed_genomes, genome_list_file, hmms_file = reorganize_for_singlem_genome_input(
-        gene_sequences, usable_taxonomy, genome_input_dir, min_sequences_per_gene,
-        allow_missing_taxonomy=allow_missing_taxonomy,
     if peer_selection:
         import peer_copy_selection
         n_jobs = getattr(snakemake, 'threads', 1)
@@ -746,6 +746,18 @@ def main():
                     f"{len(decided)} decided by peers ({agree} agree with the top BUSCO score), "
                     f"{len(selection_report) - len(decided)} fell back to the top score (no peers)")
 
+    # Write traditional gene-centric files (for backward compatibility)
+    processed_genes = write_gene_files(
+        gene_sequences, usable_taxonomy, output_dir,
+        allow_missing_taxonomy=allow_missing_taxonomy,
+    )
+    
+    # Reorganize for singlem genome-input workflow format
+    min_sequences_per_gene = snakemake.params.get('min_sequences_per_gene', 5)
+    genome_input_dir = Path(snakemake.output.genome_input_genomes).parent
+    processed_genomes, genome_list_file, hmms_file = reorganize_for_singlem_genome_input(
+        gene_sequences, usable_taxonomy, genome_input_dir, min_sequences_per_gene,
+        allow_missing_taxonomy=allow_missing_taxonomy,
     )
     
     logger.info(f"Successfully completed aggregation: "

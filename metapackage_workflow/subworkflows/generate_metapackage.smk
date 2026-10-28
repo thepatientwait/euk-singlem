@@ -35,10 +35,51 @@ SINGLEM      = config["generate"]["singlem"]
 GRAFTM       = config["generate"]["graftm"]
 TRANSCRIPTS  = config["generate"]["transcripts"]
 COMMON       = config["common"]
+INTRONS      = config["singlem"]["introns"]
+
+# Intron variants (wildcard `introns`): corrected is always built, naive (the negative control) only on request
+# (singlem.introns.build_naive, or `--config build_naive=true`).
+def _as_bool(value):
+    """`--config build_naive=false` can arrive as the string "false"."""
+    return str(value).strip().lower() not in ("false", "0", "no", "n", "", "none")
+
+
+BUILD_NAIVE = _as_bool(config.get("build_naive", INTRONS.get("build_naive", False)))
+INTRON_VARIANTS = ["corrected"] + (["naive"] if BUILD_NAIVE else [])
+
+# Quick-check subset (singlem.introns.subset, or `--config subset=family5`): the genomes of the QC manifest are
+# reduced to a small set and every output moves to outputs/subset_<name>/. Off-target decoys are skipped.
+SUBSET = str(config.get("subset", INTRONS.get("subset", "none")))
+SUBSET_ROOT = f"outputs/subset_{SUBSET}"
+
+
+def _relocate(node):
+    """Move a subset run's outputs next to, not over, the real ones."""
+    if isinstance(node, dict):
+        return {key: _relocate(value) for key, value in node.items()}
+    if isinstance(node, str):
+        for old, new in (("outputs/singlem/", f"{SUBSET_ROOT}/singlem/"), ("outputs/transcripts/", f"{SUBSET_ROOT}/transcripts/"),
+                         ("outputs/metadata/qc/valid_", f"{SUBSET_ROOT}/metadata/qc/valid_"),
+                         ("outputs/metadata/reports/", f"{SUBSET_ROOT}/metadata/reports/")):
+            if node.startswith(old):
+                return new + node[len(old):]
+    return node
+
+
+if SUBSET != "none":
+    SINGLEM, GRAFTM, TRANSCRIPTS = _relocate(SINGLEM), _relocate(GRAFTM), _relocate(TRANSCRIPTS)
+    SINGLEM["windows"]["notebook"] = f"notebooks/rendered/subset_{SUBSET}/intron_survey.ipynb"
+SUBSET_MANIFEST = f"{SUBSET_ROOT}/metadata/busco_quality_control_results.tsv"
+# the genomes the survey, the aggregation and the transcript steps work on
+SURVEY_MANIFEST = BUSCO["quality_control_results"] if SUBSET == "none" else SUBSET_MANIFEST
+
 OFF_TARGET   = SINGLEM.get("off_target", {})
 OFF_TARGET_CONFIG = config["singlem"].get("off_target", {})
-OFF_TARGET_ENABLED = OFF_TARGET_CONFIG.get("enabled", False)
+OFF_TARGET_ENABLED = OFF_TARGET_CONFIG.get("enabled", False) and SUBSET == "none"
 OFF_TARGET_INPUT = OFF_TARGET["input"]
+
+wildcard_constraints:
+    introns = "corrected|naive"
 
 # one pixi environment per group of similar rules (see pixi.toml); override the
 # location with `--config pixi_envs_dir=/path` if pixi uses detached environments
@@ -71,16 +112,12 @@ BUSCO_LINEAGE_READY = str((ROOT / "outputs" / "metadata" / f".busco_lineage_{con
 
 BUSCO_RESULTS_FROM_MANIFEST = build_busco_targets_from_manifest(DOWNLOAD["manifest"]["genome"])
 GENOMES_WITH_TRANSCRIPTS = get_genomes_with_transcripts_factory(
-    BUSCO["quality_control_results"]
-)
-PACKAGE_DIR = (
-    str(Path(SINGLEM["packages"]["regenerated_spkg"]).parent)
-    if OFF_TARGET_ENABLED
-    else str(Path(SINGLEM["packages"]["final_spkg"]).parent)
-)
+    SURVEY_MANIFEST, TRANSCRIPTS["taxonomy_otu"],
+    genome_manifest=DOWNLOAD["manifest"]["genome"] if SUBSET == "none" else None)
 COLLECT_FINAL_PACKAGES = collect_final_packages_factory(
     checkpoint_getter = lambda: checkpoints.aggregate_busco_sequences.get(),
-    final_packages_dir = PACKAGE_DIR,
+    package_template = SINGLEM["packages"]["regenerated_spkg" if OFF_TARGET_ENABLED else "final_spkg"],
+    input_dir = SINGLEM["gene_input"]["sequences_dir"],
 )
 COLLECT_OFF_TARGET_GENOMES = build_off_target_genome_targets_factory(
     archaea_metadata_path=OFF_TARGET_INPUT["gtdb_metadata"]["archaea"],
@@ -102,8 +139,21 @@ def COLLECT_GRAFTM_PACKAGES(wildcards):
     return [GRAFTM["package"].format(busco_gene=gene) for gene in genes]
 
 
+def COLLECT_INTRON_FILES(key):
+    """Per-gene output ``key`` of rule intron_window for every aggregated BUSCO gene."""
+    def _collect(wildcards):
+        genes = sorted(p.stem for p in Path(str(checkpoints.aggregate_busco_sequences.get().output.sequences_dir)).glob("*.faa"))
+        return [SINGLEM["windows"][key].format(busco_gene=gene) for gene in genes]
+    return _collect
+
+
+def intron_window_path(variant):
+    """Window position file of one variant with the gene still a wildcard (an output of rule intron_window)."""
+    return SINGLEM["windows"]["positions"].replace("{introns}", variant)
+
+
 def COLLECT_VALID_FINAL_PACKAGES(wildcards):
-    checkpoint_output = checkpoints.filter_invalid_singlem_packages.get().output
+    checkpoint_output = checkpoints.filter_invalid_singlem_packages.get(introns=wildcards.introns).output
     valid_manifest = Path(str(checkpoint_output.valid_packages_manifest))
 
     if not valid_manifest.exists():
@@ -146,8 +196,9 @@ def COLLECT_PER_GENOME_OFF_TARGET_RESULTS(wildcards):
 
 rule all:
     input:
-        SINGLEM["metapackages"]["final"],
-        BUSCO_RESULTS_FROM_MANIFEST
+        expand(SINGLEM["metapackages"]["final"], introns=INTRON_VARIANTS),
+        SINGLEM["windows"]["notebook"],
+        [] if SUBSET != "none" else BUSCO_RESULTS_FROM_MANIFEST
 
 
 rule init_busco_lineage_cache:
@@ -276,15 +327,35 @@ checkpoint dereplicate_genomes:
 
 
 def BUSCO_MANIFEST_FOR_AGGREGATION(wildcards):
+    if SUBSET != "none":
+        return SUBSET_MANIFEST
     if DEREP_ENABLED:
         return checkpoints.dereplicate_genomes.get().output.filtered_manifest
     return BUSCO["quality_control_results"]
+
+
+if SUBSET != "none":
+    rule make_subset_manifest:
+        """Quick-check subset of the genomes in the BUSCO QC manifest (singlem.introns.subset)."""
+        input:
+            taxonomy = DOWNLOAD["metadata"]["taxonomy"]["mapping"]
+        output:
+            manifest = SUBSET_MANIFEST
+        params:
+            mode = SUBSET,
+            per_family = int(INTRONS.get("subset_per_family", 5)),
+            seed = int(INTRONS.get("subset_seed", 1)),
+            qc_manifest = BUSCO["quality_control_results"]  # read, not tracked: see scripts/subset_busco_manifest.py
+        log:
+            log_path("make_subset_manifest")
+        script:
+            str(SCRIPTS_DIR / "subset_busco_manifest.py")
 
 # TODO: ADD NCBI GENOMES...
 
 checkpoint aggregate_busco_sequences:
     input:
-        quality_report = config["generate"]["quality_report"]["checkm2_style"],
+        quality_report = config["generate"]["quality_report"]["checkm2_style"] if SUBSET == "none" else SUBSET_MANIFEST,
         busco_manifest = BUSCO_MANIFEST_FOR_AGGREGATION,
         taxonomy      = DOWNLOAD["metadata"]["taxonomy"]["mapping"]
     output:
@@ -294,6 +365,8 @@ checkpoint aggregate_busco_sequences:
     params:
         min_sequences_per_gene = config["singlem"]["min_sequences_per_gene"],
         use_multi_copy = config["busco"]["quality_control"].get("use_multi_copy", False),
+        multi_copy_selection = config["busco"]["quality_control"].get("multi_copy_selection", "top_score"),
+        multi_copy_min_gain = config["busco"]["quality_control"].get("multi_copy_min_gain", 0.02),
         # Keep sequences/genomes lacking a usable taxonomy (default: exclude them)
         allow_missing_taxonomy = config["singlem"].get("allow_missing_taxonomy", False)
     retries: TOTAL_ATTEMPTS
@@ -330,45 +403,117 @@ rule graftm_create:
         "--output {output.gpkg} "
         "--threads {threads} "
         "--no_tree "
-        "--taxonomy {input.taxonomy_file}"
+        "--taxonomy {input.taxonomy_file}; "
+        # the aligned FASTA must have exactly one column per HMM match state: SingleM window positions are
+        # HMM match columns (stop symbols in the input used to add extra columns)
+        "hmm_len=$(awk '/^LENG/{{print $2; exit}}' {params.hmm_path}); "
+        "aln_len=$(awk '!/^>/{{print length($0); exit}}' {output.alignment}); "
+        "if [ \"$hmm_len\" != \"$aln_len\" ]; then "
+        "echo \"ERROR: alignment width $aln_len != HMM length $hmm_len\" >&2; exit 1; fi"
 
 
-rule singlem_seqs:
-    """Generate window positions for SingleM packages"""
+rule intron_window:
+    """Survey introns of one BUSCO gene and choose the SingleM window of each variant.
+
+    SingleM windows are matched by metagenomic reads, which cannot cross an intron. This maps the introns of
+    every genome (BUSCO's miniprot gene models) onto the HMM and writes two windows, in HMM match columns (what
+    `singlem create --hmm-position` and `singlem pipe` use): naive, the best-covered window, and corrected, the
+    best-covered window that crosses an intron in at most max_span_fraction of the genomes covering it.
+    The per-genome and per-window tables feed the intron notebook.
+    """
     input:
-        alignment = GRAFTM["alignment"]
+        sequences      = SINGLEM["gene_input"]["gene"]["fasta"],
+        hmm            = lambda wildcards: COMMON["busco_hmm"]["file"].format(busco_gene=wildcards.busco_gene),
+        busco_manifest = SURVEY_MANIFEST
     output:
-        window_position_file = SINGLEM["windows"]["positions"]
+        position_naive     = intron_window_path("naive"),
+        position_corrected = intron_window_path("corrected"),
+        introns  = SINGLEM["windows"]["introns"],
+        genomes  = SINGLEM["windows"]["genomes"],
+        scan     = SINGLEM["windows"]["scan"],
+        choice   = SINGLEM["windows"]["choice"]
+    params:
+        min_intron        = INTRONS["min_intron"],
+        max_span_fraction = INTRONS["max_span_fraction"],
+        score_tolerance   = INTRONS["score_tolerance"],
+        min_valid         = INTRONS["min_valid_genomes"],
+        window_nt         = 60,  # SingleM's default window
+        use_multi_copy    = config["busco"]["quality_control"].get("use_multi_copy", False)
+    threads: 2
+    retries: TOTAL_ATTEMPTS
+    resources: **RESOURCE_PROFILE(mem_scale=2.0, runtime="2h")
+    log:
+        log_path("intron_window", "busco_gene")
+    conda:
+        env("singlem")
+    script:
+        str(SCRIPTS_DIR / "intron_window.py")
+
+
+rule window_intron_summary:
+    """Collect the per-gene window decisions; with introns.strict, fail if any window still spans introns."""
+    input:
+        choices = COLLECT_INTRON_FILES("choice")
+    output:
+        summary = SINGLEM["windows"]["summary"]
+    params:
+        strict = bool(INTRONS.get("strict", False))
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("singlem_seqs", "busco_gene")
+        log_path("window_intron_summary")
+    script:
+        str(SCRIPTS_DIR / "window_intron_summary.py")
+
+
+rule intron_survey_notebook:
+    """Executed notebook: intron presence, conservation, and where the SingleM windows fall."""
+    input:
+        template = str(ROOT / "notebooks" / "intron_survey.ipynb"),
+        choices  = COLLECT_INTRON_FILES("choice"),
+        genomes  = COLLECT_INTRON_FILES("genomes"),
+        introns  = COLLECT_INTRON_FILES("introns"),
+        scans    = COLLECT_INTRON_FILES("scan"),
+        taxonomy = DOWNLOAD["metadata"]["taxonomy"]["mapping"],
+        gene_names = str(Path(COMMON["busco_hmm"]["dir"]).parent / "links_to_ODB12.txt")  # BUSCO id -> protein name
+    output:
+        notebook = SINGLEM["windows"]["notebook"]
+    params:
+        notebook = str(ROOT / "notebooks" / "intron_survey.ipynb"),
+        nb_params = lambda wildcards, input: {
+            "intron_dir": str(Path(SINGLEM["windows"]["choice"].format(busco_gene="x")).parent.resolve()),
+            "taxonomy": str(Path(input.taxonomy).resolve()),
+            "gene_names": str(Path(input.gene_names).resolve()),
+            "max_span_fraction": INTRONS["max_span_fraction"],
+            "build_naive": BUILD_NAIVE,
+            "subset": SUBSET,
+            "out_dir": str((Path(SINGLEM["windows"]["notebook"]).parent / "tables").resolve()),
+        }
+    threads: 1
+    retries: TOTAL_ATTEMPTS
+    resources: **RESOURCE_PROFILE(mem_scale=4)
+    log:
+        log_path("intron_survey_notebook")
     conda:
-        env("singlem")
-    shell:
-        "exec > {log} 2>&1; "
-        "singlem seqs "
-        "--alignment {input.alignment} "
-        "--alignment-type aa > {output.window_position_file}"
+        env("notebook")
+    script:
+        str(SCRIPTS_DIR / "run_notebook.py")
 
 
 rule singlem_create:
     """Create SingleM packages from GraftM packages"""
     input:
         gpkg                 = GRAFTM["package"],
-        window_position_file = SINGLEM["windows"]["positions"]
+        window_position_file = lambda wildcards: SINGLEM["windows"]["positions"].format(busco_gene=wildcards.busco_gene, introns=wildcards.introns)
     output:
         spkg = directory(SINGLEM["packages"]["initial_spkg"])
     params:
         taxonomy_file  = SINGLEM["gene_input"]["gene"]["taxonomy"],
         target_domains = config["singlem"]["target_domains"]
     retries: TOTAL_ATTEMPTS
-        multi_copy_selection = config["busco"]["quality_control"].get("multi_copy_selection", "top_score"),
     resources: **RESOURCE_PROFILE(mem_scale=0.5, runtime="1h")
-        multi_copy_selection = config["busco"]["quality_control"].get("multi_copy_selection", "top_score"),
-        multi_copy_min_gain = config["busco"]["quality_control"].get("multi_copy_min_gain", 0.02),
     log:
-        log_path("singlem_create", "busco_gene")
+        log_path("singlem_create", "introns", "busco_gene")
     conda:
         env("singlem")
     shell:
@@ -392,7 +537,7 @@ rule singlem_chainsaw:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("singlem_chainsaw", "busco_gene")
+        log_path("singlem_chainsaw", "introns", "busco_gene")
     conda:
         env("singlem")
     shell:
@@ -500,7 +645,7 @@ rule singlem_regenerate:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=4.0, runtime="2h")
     log:
-        log_path("singlem_regenerate", "busco_gene")
+        log_path("singlem_regenerate", "introns", "busco_gene")
     conda:
         env("singlem")
     script:
@@ -517,7 +662,7 @@ checkpoint filter_invalid_singlem_packages:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("filter_invalid_singlem_packages")
+        log_path("filter_invalid_singlem_packages", "introns")
     script:
         str(SCRIPTS_DIR / "filter_invalid_singlem_packages.py")
 
@@ -526,14 +671,16 @@ rule create_draft_metapackage:
     """Create draft metapackage from protein packages for transcript processing"""
     input:
         final_packages = COLLECT_VALID_FINAL_PACKAGES,
-        invalid_packages_report = lambda wildcards: checkpoints.filter_invalid_singlem_packages.get().output.invalid_packages_report
+        invalid_packages_report = lambda wildcards: checkpoints.filter_invalid_singlem_packages.get(introns=wildcards.introns).output.invalid_packages_report,
+        # window check: stops here with introns.strict (the naive variant is a control and is not gated)
+        window_summary = lambda wildcards: SINGLEM["windows"]["summary"] if wildcards.introns == "corrected" else []
     output:
         metapackage = directory(SINGLEM["metapackages"]["draft"])
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=4.0, runtime="8h")
     log:
-        log_path("create_draft_metapackage")
+        log_path("create_draft_metapackage", "introns")
     conda:
         env("singlem")
     shell:
@@ -547,17 +694,21 @@ rule create_draft_metapackage:
 
 
 rule extract_transcripts:
-    """Extract transcript sequences from genome using BUSCO annotations"""
+    """Extract BUSCO gene sequences from the genome: corrected = cut at introns (one record per exon block), naive = whole gene span"""
     input:
         genome     = DOWNLOAD["genomes"]["by_group"],
         full_table = BUSCO["full_table"]
     output:
         transcripts = TRANSCRIPTS["extracted"]
+    params:
+        min_intron  = INTRONS["min_intron"],
+        min_exon_nt = INTRONS["min_exon_nt"],
+        mode        = lambda wildcards: "exon_blocks" if wildcards.introns == "corrected" else "gene_span"
     threads: 1
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("extract_transcripts", "group", "genome_acc")
+        log_path("extract_transcripts", "introns", "group", "genome_acc")
     script:
         str(SCRIPTS_DIR / "extract_busco_transcripts.py")
 
@@ -573,7 +724,7 @@ rule eukaryotic_transcripts:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("eukaryotic_transcripts", "group", "genome_acc")
+        log_path("eukaryotic_transcripts", "introns", "group", "genome_acc")
     conda:
         env("singlem")
     shell:
@@ -597,7 +748,7 @@ rule assign_eukaryotic_taxonomy:
     retries: TOTAL_ATTEMPTS
     resources: **DEFAULT_RESOURCES
     log:
-        log_path("assign_eukaryotic_taxonomy", "group", "genome_acc")
+        log_path("assign_eukaryotic_taxonomy", "introns", "group", "genome_acc")
     script:
         str(SCRIPTS_DIR / "assign_eukaryotic_taxonomy.py")
 
@@ -605,14 +756,14 @@ rule assign_eukaryotic_taxonomy:
 rule aggregate_transcript_taxonomy:
     """Aggregate all per-taxon transcript taxonomy results from QC-passing BUSCO genomes"""
     input:
-        busco_manifest  = BUSCO["quality_control_results"],
+        busco_manifest  = SURVEY_MANIFEST,
         taxonomy_tables = GENOMES_WITH_TRANSCRIPTS
     output:
         combined_otu = TRANSCRIPTS["aggregate"]["combined_otu"]
     threads: 1
     retries: TOTAL_ATTEMPTS
     log:
-        log_path("aggregate_transcript_taxonomy")
+        log_path("aggregate_transcript_taxonomy", "introns")
     conda:
         env("singlem")
     resources: **DEFAULT_RESOURCES
@@ -642,7 +793,7 @@ rule make_nucleotide_sdb:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=2.0, runtime="2h")
     log:
-        log_path("make_nucleotide_sdb")
+        log_path("make_nucleotide_sdb", "introns")
     conda:
         env("singlem")
     shell:
@@ -664,7 +815,7 @@ rule create_final_metapackage:
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=8.0, runtime="8h")
     log:
-        log_path("create_final_metapackage")
+        log_path("create_final_metapackage", "introns")
     conda:
         env("singlem")
     shell:

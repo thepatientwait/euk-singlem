@@ -59,6 +59,12 @@ class TestTopHit(unittest.TestCase):
             self.assertEqual(qc._count_complete_markers(self.table, multi), len(self.selected(multi)))
 
 
+class TestCleanProtein(unittest.TestCase):
+    def test_stop_symbols_are_removed_everywhere(self):
+        self.assertEqual(ab.clean_protein("MKV*LL*"), "MKVLL")
+        self.assertEqual(ab.clean_protein("MKV"), "MKV")
+
+
 class TestStatusSidecar(unittest.TestCase):
     def test_sidecar_lists_status_per_sequence(self):
         seqs = {

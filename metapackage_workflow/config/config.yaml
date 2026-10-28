@@ -65,6 +65,28 @@ singlem:
     enabled: false
     precluster_ani: 90
     ani: 95
+  # Introns. SingleM windows are matched against metagenomic DNA reads, which cannot cross an
+  # intron, so a window that spans one is not recoverable from the genomes that have it.
+  # Two metapackage variants (wildcard `introns`):
+  #   corrected: best-covered window crossing an intron in at most max_span_fraction of the genomes
+  #              covering it; nucleotide-database sequences are cut at introns
+  #   naive:     best-covered window, introns ignored; nucleotide-database sequences are whole gene spans.
+  #              A negative control, off by default (it doubles the transcript and packaging work).
+  #              The survey always computes both windows, so the notebook compares them either way.
+  introns:
+    build_naive: false      # true: also build the naive metapackage
+    min_intron: 30          # genomic gaps shorter than this (nt) are frameshifts, not introns
+    min_exon_nt: 60         # corrected transcripts are cut at introns; shorter pieces are dropped
+    max_span_fraction: 0.05
+    score_tolerance: 0.005  # windows within this fraction of the best score are equally covered; take the one with fewest introns
+    min_valid_genomes: 20   # genomes with a mapped gene model needed to judge a window
+    strict: false           # true: fail the run if any gene has no corrected window under max_span_fraction
+    # Quick-check subset of the genomes already in the BUSCO QC manifest (outputs go to outputs/subset_<name>/,
+    # off-target decoys are skipped): none | family5 | jgi_p10k | jgi_p10k_family5
+    # (or `--config subset=family5`). family5 = subset_per_family random genomes from every family.
+    subset: none
+    subset_per_family: 5
+    subset_seed: 1
   off_target:
     enabled: true
     hmm_evalue: 1e-5

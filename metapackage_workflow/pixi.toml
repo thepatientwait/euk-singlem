@@ -53,9 +53,22 @@ busco = ">=5"
 [feature.coverm.dependencies]
 coverm = "0.7.*"
 
+# executed notebooks (rule intron_survey_notebook)
+[feature.notebook.dependencies]
+python = "3.12.*"
+jupyter_core = "*"
+nbconvert = "*"
+nbformat = "*"
+ipykernel = "*"
+numpy = "*"
+matplotlib = "*"
+polars = "*"
+pyyaml = "*"             # scripts/snapshot_intron_survey.py
+
 [environments]
 default = { solve-group = "all" }
 singlem = { features = ["singlem"], no-default-feature = true }
 graftm  = { features = ["graftm"],  no-default-feature = true }
 busco   = { features = ["busco"],   no-default-feature = true }
 coverm  = { features = ["coverm"],  no-default-feature = true }
+notebook = { features = ["notebook"], no-default-feature = true }
