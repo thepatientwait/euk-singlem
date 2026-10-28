@@ -3,6 +3,10 @@
 **/outputs/
 **/output_subset_*/
 **/.snakemake/
+# Frozen result snapshots (hundreds of MB; RUN_INFO.json inside says how to rebuild them)
+**/snapshots/
+# Executed notebooks (the templates next to them are tracked)
+**/notebooks/rendered/
 **/.pixi/
 **/__pycache__/
 **/*.egg-info/

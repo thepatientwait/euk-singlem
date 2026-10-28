@@ -22,7 +22,7 @@ Two subworkflows, run separately (config lives in `metapackage_workflow/config/`
 
 ```bash
 cd metapackage_workflow
-pixi install --all   # once: the snakemake driver (default) + per-rule envs (singlem, graftm, busco, coverm)
+pixi install --all   # once: the snakemake driver (default) + per-rule envs (singlem, graftm, busco, coverm, notebook)
 
 # phase 1: metadata + genome download (JGI / NCBI / P10K -> unified manifest)
 pixi run snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda \
@@ -76,6 +76,57 @@ Notes:
   (md5-checked) and fall back to NCBI Datasets (compressed with pigz, CPUs double per retry).
 - `busco.quality_control.use_multi_copy: true` keeps Duplicated BUSCO genes, each represented
   by its top-scoring copy (one sequence per gene per genome, never several copies).
+- **Introns and SingleM windows.** SingleM windows (20 aa / 60 nt) are matched against
+  metagenomic DNA reads, which cannot cross an intron, so a window that contains an intron in
+  some genome cannot be recovered from that genome. Introns are read from the exon structure of
+  the miniprot gene models BUSCO writes (`busco_sequences/*/<gene>.gff`; a gap between exons of
+  at least `singlem.introns.min_intron` nt is an intron). The metapackage is built in up to two
+  **intron variants** (wildcard `introns`, in the paths of packages, metapackages and transcripts):
+  - `corrected` (always built): the window is the best-covered one that crosses an intron in at most
+    `max_span_fraction` (5%) of the genomes covering it (windows within `score_tolerance` of the best
+    score count as equally covered; the one with fewest introns wins), and the sequences of the
+    nucleotide database (rule `extract_transcripts`) are cut at the introns: one record per
+    intron-free block (`<gene>|exon<i>of<n>`), blocks shorter than `min_exon_nt` dropped.
+  - `naive` (the negative control, **off by default**: `singlem.introns.build_naive: true` or
+    `--config build_naive=true`): the best-covered window, introns ignored, and whole-gene spans
+    (introns included) in the nucleotide database. It doubles the packaging and per-genome transcript
+    work, which is why it is optional. The survey always computes both windows, so the notebook compares
+    them whether or not the naive metapackage was built.
+  - `intron_window` (per gene, shared by both variants) aligns every genome's protein to the BUSCO HMM, maps its
+    introns onto the HMM columns, scans every 20-column window start and writes
+    `outputs/singlem/introns/<gene>.window_position.{naive,corrected}.txt` plus per-intron, per-genome and
+    per-window tables. Windows are numbered in HMM match columns, which is what `singlem create --hmm-position`
+    and `singlem pipe` use. Genes with a frameshift or a CDS that does not match the protein are not used for the
+    intron statistics (still counted for coverage).
+  - `window_intron_summary` collects the decisions (`outputs/metadata/reports/window_intron_summary.tsv`)
+    and gates `create_draft_metapackage` of the corrected variant: with `introns.strict: true` the run stops
+    if any gene has no corrected window under the limit.
+  - **Stop symbols.** BUSCO proteins contain `*`. `graftM create --hmm` (unlike its mafft path) does not strip them;
+    `hmmalign` writes them in upper case, GraftM only deletes lower-case insert columns, and the columns holding a `*`
+    stay in the alignment as nearly empty columns (later rewritten to `X`). The alignment is then wider than the HMM and
+    `singlem seqs` window numbers (alignment columns) no longer match the HMM columns that `create`/`pipe` use.
+    `aggregate_busco_sequences.py` therefore strips `*`, and `graftm_create` fails if the alignment width differs from
+    the HMM length. (`singlem seqs` is no longer used: windows come from the survey.)
+  - **Quick-check subset.** `singlem.introns.subset` (or `--config subset=family5`; also `jgi_p10k`, `jgi_p10k_family5`)
+    reduces the genomes of the existing BUSCO QC manifest to `subset_per_family` random genomes per family
+    (`subset_seed`) and writes everything to `outputs/subset_<name>/`. Off-target decoys are skipped. The subset
+    is read from the QC manifest on disk without rerunning BUSCO (`--forcerun make_subset_manifest` after it changes).
+  - `intron_survey_notebook` writes `notebooks/rendered/intron_survey.ipynb`
+    (`notebooks/rendered/subset_<name>/` for a subset run) with tables and PNGs in `tables/`. The notebook
+    (`notebooks/intron_survey.ipynb`) is generated: edit `notebooks/build_intron_survey.py` and run
+    `.pixi/envs/notebook/bin/python notebooks/build_intron_survey.py`. Besides the summary figures it draws the
+    alignment of the most covered, cleanest and worst genes as one row per genome (coloured by phylum) with the
+    introns and the naive (red) and corrected (magenta) windows. Executed notebooks live in
+    `<workflow>/notebooks/rendered/` (gitignored), next to their templates.
+  - **Snapshots.** `scripts/snapshot_intron_survey.py` freezes the survey so it can be repeated after the
+    metapackage changes (use the `notebook` pixi env):
+    `python scripts/snapshot_intron_survey.py create --name <name> [--subset family5]` copies the per-gene tables (gzipped),
+    the windows of both variants, the taxonomy, protein names and BUSCO manifest, the config, the code and the notebook into
+    `snapshots/intron_survey/<name>/`, with `inputs.tsv` (md5 of every gene FASTA/HMM/manifest), `RUN_INFO.json` (git commit,
+    tool versions, settings) and `MANIFEST.tsv`. `compare <old> <new>` reports which inputs changed and how windows and span
+    fractions moved per gene (snapshots from before the naive/corrected rename still compare); `render <name>` re-runs the
+    notebook on a snapshot alone. Snapshots are not tracked by git.
+  - To inspect one gene by hand: `.pixi/envs/singlem/bin/python scripts/intron_window.py --help`.
 - The NCBI/P10K/JGI sources are consolidated by `scripts/build_unified_manifest.py`;
   `scripts/ncbi_taxid_resolver.py` and `scripts/fetch_ncbi_taxonomy.py` resolve
   taxonomy (Datasets API with Entrez fallback for replaced/suppressed assemblies).
@@ -100,8 +151,8 @@ in `config.yaml`), i.e. up to four trees:
 
 Outputs are under `output/{derep}/{copies}/`. FastTree runs with the protein model
 (`tree.fasttree_args`, default `-lg -gamma`). Two **global notebooks** (one executed copy each in
-`output/notebooks/`, covering every `{derep}/{copies}` variant side by side, mostly as figures; the
-numbers and PNG copies of each figure are in `output/notebooks/tables/<notebook>/`):
+`notebooks/rendered/`, covering every `{derep}/{copies}` variant side by side, mostly as figures; the
+numbers and PNG copies of each figure are in `notebooks/rendered/tables/<notebook>/`):
 
 - `tree_diagnostics` (`notebooks/tree_diagnostics.ipynb`, alignment side): gene occupancy, divergence and
   gene overlap within vs between clades, per-gene separation, single vs multi copy, multicopy top-hit check.
