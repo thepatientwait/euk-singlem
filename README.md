@@ -176,9 +176,10 @@ on a small genome set and writes to `output_subset_<name>/` so the full run is u
 `jgi_p10k_family5`. The subset's BUSCO genes are aggregated on their own
 (`aggregate_subset_busco_sequences`), so no full re-aggregation is needed.
 
-PhyloRank's RED is a median over rootings, which makes some branch lengths negative and lets a
-child sit below its parent; `assign_taxonomy` ignores those lengths, raises each node's RED to at
-least its parent's, and logs how many nodes it changed.
+PhyloRank's RED is a median over rootings, which can make some branch lengths negative and let a
+child sit below its parent. `phylorank_red` therefore post-processes the RED trees with
+`scripts/monotone_red_tree.py` (RED made non-decreasing from root to tip, branch lengths recomputed, raw trees kept as
+`*.phylorank_raw.tree`); `assign_taxonomy` keeps its own guard and warns if it ever has to raise a node.
 
 Config: `config.yaml` (metapackage inputs, `external` genomes, `outgroup`,
 BUSCO, EukCC, alignment, taxonomy) and `paths.yaml`. Example inputs are
