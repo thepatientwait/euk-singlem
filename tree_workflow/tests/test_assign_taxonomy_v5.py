@@ -24,6 +24,41 @@ def run(newick, known, cutoffs=CUTOFFS):
     return parsed, {r["genome_id"] for r in tgt}, stats
 
 
+def run_rows(newick, known, cutoffs=CUTOFFS):
+    tree = at.read_red_tree(newick)
+    ref, tgt, _ = at.assign_taxonomy(tree, known, cutoffs)
+    return {r["genome_id"]: r for r in ref + tgt}
+
+
+class TestNovelty(unittest.TestCase):
+    """assign_taxonomy writes how new each leaf is, so the metadata no longer re-parses placeholder names."""
+
+    NWK = "(((c:1,e:1)n3|RED=0.4:0.1,a:1)n2|RED=0.3:0.1,d:1)n1|RED=0.2:0.1;"
+
+    def test_known_species_and_new_species_in_a_known_genus(self):
+        known = {"a": full("P", "C", "O", "F", "G", "G a"), "c": full("P", "C", "O", "F", "G", "G x"),
+                 "e": full("P", "C", "O", "F", "G", "G y"), "d": ""}
+        rows = run_rows(self.NWK, known)
+        self.assertEqual(rows["a"]["novelty"], "known")
+        self.assertEqual(rows["d"]["novelty"], "species")        # a target inside a known genus of several species: only the species is new
+
+    def test_a_target_in_an_unlabelled_clade_is_new_from_the_phylum_down(self):
+        rows = run_rows("(a:1,b:1)n1|RED=0.1:0.1;", {"a": "", "b": ""})
+        self.assertEqual({r["novelty"] for r in rows.values()}, {"phylum"})
+
+    def test_novelty_of_unit(self):
+        P = at.Placeholder
+        names = {r: "x" for r in at.RANKS}
+        self.assertEqual(at.novelty_of(names), "known")
+        names["species"] = P("species", "genus", "x")
+        self.assertEqual(at.novelty_of(names), "species")
+        names["genus"] = P("genus", "family", "x")
+        self.assertEqual(at.novelty_of(names), "genus")
+        names["order"] = "named"                      # a named rank breaks the chain, higher placeholders do not count
+        names["phylum"] = P("phylum", None, "unk")
+        self.assertEqual(at.novelty_of(names), "genus")
+
+
 class TestMonotoneRed(unittest.TestCase):
     def test_child_raised_to_parent_only_when_lower(self):
         tree = at.read_red_tree("(((a:1,b:1)n3|RED=0.7:0.1,c:1)n2|RED=0.4:0.1,d:1)n1|RED=0.5:0.1;")
