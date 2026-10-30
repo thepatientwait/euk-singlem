@@ -10,6 +10,7 @@ A permanently missing file (HTTP 404) leaves a zero-byte marker, like the other 
 import csv
 import gzip
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -49,9 +50,18 @@ def fetch_part(url: str, dest: Path) -> None:
             pass
 
 
+_ACC_RE = re.compile(r"(?:^>|\|gb\|)([A-Z]{4,6}\d{2,}\.\d+)")
+
+
+def header_accession(line: str) -> str:
+    """Contig accession of a FASTA header: ``>GLPS01000001.1 ...`` or the old ``>gi|760317201|gb|GBYM01000001.1| ...``."""
+    match = _ACC_RE.search(line.split()[0] if "|" not in line else line)
+    return match.group(1) if match else ""
+
+
 def filter_version(sources, out_path: Path, prefix: str, version: int) -> int:
-    """Concatenate the gzip parts, keeping records whose id starts with ``<prefix><version:02d>``."""
-    wanted = f">{prefix}{version:02d}"
+    """Concatenate the gzip parts, keeping records whose accession starts with ``<prefix><version:02d>``."""
+    wanted = f"{prefix}{version:02d}"
     kept = 0
     keep = False
     with gzip.open(out_path, "wt", compresslevel=6) as out:
@@ -59,7 +69,7 @@ def filter_version(sources, out_path: Path, prefix: str, version: int) -> int:
             with gzip.open(src, "rt") as handle:
                 for line in handle:
                     if line.startswith(">"):
-                        keep = line.startswith(wanted)
+                        keep = header_accession(line).startswith(wanted)
                         kept += keep
                     if keep:
                         out.write(line)

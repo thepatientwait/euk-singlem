@@ -39,6 +39,8 @@ submit via `snakemake_mqsub`, the user starts big runs.
 - Transcriptomes: only taxa no genome covers (genomes are trusted more); they go into the tree too (complete/partial taxonomy). BUSCO transcriptome mode (MetaEuk). Derep: galah on marker CDS, `ani: 97`, transcriptomes lose 50 completeness points so genomes win clusters.
 - Token rotation is handled by the user.
 
+- The user always runs the Snakemake workflows; the assistant only does dry runs, tests and scratch trials (see `AGENTS.md`).
+
 ## Gotchas
 
 - `--config key=false` arrives as the string `"false"`; use the helper that parses booleans.

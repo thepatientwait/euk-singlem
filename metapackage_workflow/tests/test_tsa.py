@@ -103,6 +103,15 @@ class TestDownload(unittest.TestCase):
             self.assertIn("GLPS01000002.1", text)
             self.assertNotIn("GLPS02", text)
 
+    def test_old_gi_headers(self):
+        self.assertEqual(dl.header_accession(">gi|760317201|gb|GBYM01000001.1| TSA: Coriolopsis gallica cotig_1"), "GBYM01000001.1")
+        self.assertEqual(dl.header_accession(">GLPS01000001.1 TSA: x"), "GLPS01000001.1")
+        with tempfile.TemporaryDirectory() as tmp:
+            part, out = Path(tmp) / "a.gz", Path(tmp) / "out.gz"
+            with gzip.open(part, "wt") as h:
+                h.write(">gi|1|gb|GBYM01000001.1| TSA: a\nACGT\n>gi|2|gb|GBYM02000001.1| TSA: b\nTT\n")
+            self.assertEqual(dl.filter_version([part], out, "GBYM", 1), 1)
+
 
 TABLE = (
     "# BUSCO version is: 6.1.0\n# The lineage dataset is: eukaryota_odb12\n"
