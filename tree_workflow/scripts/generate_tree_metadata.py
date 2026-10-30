@@ -5,6 +5,7 @@ from pathlib import Path
 import polars as pl
 
 from log_redirect import redirect_to_snakemake_log
+from source_groups import group_of, read_source_groups
 
 # send this rule's stdout/stderr to its log: file
 redirect_to_snakemake_log()
@@ -22,49 +23,17 @@ PREFIXES = {
 
 
 def expand_taxonomy(frame: pl.DataFrame) -> pl.DataFrame:
+    """One column per rank (``p__Ascomycota`` ...): the lineage is ``;``-separated and every item carries its prefix."""
     expressions = []
     for rank, prefix in PREFIXES.items():
         expressions.append(
-            pl.col("taxonomy")
-            .str.extract(rf"(?:^|;\s*)({prefix}[^;]*)", 1)
-            .fill_null(f"{prefix}")
+            pl.col("taxonomy").str.split(";")
+            .list.eval(pl.element().str.strip_chars().filter(pl.element().str.starts_with(prefix)))
+            .list.first()
+            .fill_null(prefix)
             .alias(rank)
         )
     return frame.with_columns(expressions)
-
-
-def determine_novelty(frame: pl.DataFrame) -> pl.DataFrame:
-    # 1. Identify placeholders, supporting both un-prefixed (g1) and prefixed (Family_g1) syntax
-    placeholders = {
-        "species": pl.col("species").str.contains(r" sp_\d+$"),
-        "genus": pl.col("genus").str.contains(r"(?:^|_)[g]\d+$"),
-        "family": pl.col("family").str.contains(r"(?:^|_)[f]\d+$"),
-        "order": pl.col("order").str.contains(r"(?:^|_)[o]\d+$"),
-        "class": pl.col("class").str.contains(r"(?:^|_)[c]\d+$"),
-        "phylum": pl.col("phylum").str.contains(r"(?:^|_)[p]\d+$"),
-    }
-    
-    # 2. Build a bottom-up unbroken chain. 
-    # A rank is only "novel" if it AND all ranks below it are placeholders.
-    s_novel = placeholders["species"]
-    g_novel = s_novel & placeholders["genus"]
-    f_novel = g_novel & placeholders["family"]
-    o_novel = f_novel & placeholders["order"]
-    c_novel = o_novel & placeholders["class"]
-    p_novel = c_novel & placeholders["phylum"]
-    
-    # 3. Assign just the rank name or "known"
-    novelty_expr = (
-        pl.when(p_novel).then(pl.lit("phylum"))
-        .when(c_novel).then(pl.lit("class"))
-        .when(o_novel).then(pl.lit("order"))
-        .when(f_novel).then(pl.lit("family"))
-        .when(g_novel).then(pl.lit("genus"))
-        .when(s_novel).then(pl.lit("species"))
-        .otherwise(pl.lit("known"))
-    )
-    
-    return frame.with_columns(novelty_expr.alias("novelty"))
 
 
 def read_taxonomy(path: Path, source: str, novelty: str | None = None) -> pl.DataFrame:
@@ -89,10 +58,12 @@ def read_taxonomy(path: Path, source: str, novelty: str | None = None) -> pl.Dat
         raise ValueError(f"{path} is missing columns: {', '.join(sorted(missing))}")
 
     result = frame.select("genome_id", "taxonomy")
-    if novelty is None or "novelty" not in frame.columns:
-        result = result.with_columns(pl.lit(novelty or "known").alias("novelty"))
+    if "novelty" in frame.columns:
+        # written by assign_taxonomy: the highest rank from which everything below is a new taxon, else "known"
+        result = result.with_columns(frame.get_column("novelty").fill_null(novelty or "known").alias("novelty"))
     else:
-        result = result.with_columns(frame.get_column("novelty").fill_null(novelty).alias("novelty"))
+        # taxonomy files from before assign_taxonomy wrote novelty: targets are new, references known
+        result = result.with_columns(pl.lit(novelty or "known").alias("novelty"))
     result = result.with_columns(pl.lit(source).alias("source"))
     return result
 
@@ -108,11 +79,15 @@ def main() -> None:
         novelty="novel",
     )
 
+    # download source of each genome (fungi, algae, p10k, ncbi, tsa, external, ...); "unknown" when a genome is in
+    # no BUSCO QC manifest. Lets the notebooks judge transcriptome (tsa) tips separately.
+    groups = read_source_groups(list(getattr(snakemake.input, "busco_manifests", []) or []))
+
     metadata = (
         pl.concat([reference, target], how="vertical_relaxed")
         .unique(subset=["genome_id"], keep="last")
         .pipe(expand_taxonomy)
-        .pipe(determine_novelty)
+        .with_columns(pl.col("genome_id").map_elements(lambda g: group_of(g, groups), return_dtype=pl.String).alias("source_group"))
         .sort("genome_id")
     )
     

@@ -33,6 +33,7 @@ import polars as pl
 
 sys.path.append(str(Path(__file__).parent))
 import intron_utils as iu  # noqa: E402
+from busco_run import BuscoRun  # noqa: E402
 
 try:
     snakemake  # type: ignore[name-defined]
@@ -97,13 +98,12 @@ def gene_model(full_table: Path, busco_id: str, use_multi_copy: bool):
     row = top_hit(full_table, busco_id, use_multi_copy)
     if row is None:
         return "no_hit", None
-    subdir = "single_copy_busco_sequences" if row["Status"] == "Complete" else "multi_copy_busco_sequences"
-    gff = full_table.parent / "busco_sequences" / subdir / f"{busco_id}.gff"
-    if not gff.exists():
+    runs = BuscoRun(full_table.parent)
+    if runs.layout == "none":
         return "no_gff", None
-    models = iu.parse_gff(gff)
+    models = runs.gff_models(busco_id)
     if not models:
-        return "no_model", None
+        return ("no_gff" if not runs.gff_lines(busco_id) else "no_model"), None
     model = iu.select_model(models, row["Sequence"], int(row["Gene Start"]), int(row["Gene End"]), row.get("Strand"))
     if model is None and len(models) == 1:
         model = models[0]
@@ -123,6 +123,9 @@ def run(a) -> dict:
         table = results.get(genome)
         if table is None:
             return name, "not_in_manifest", None, None
+        if table.parts[-4] == "tsa":
+            # transcriptomes are spliced: no gene model, no introns. Never judged for window choice.
+            return name, "transcriptome", None, table
         status, model = gene_model(table, busco_id, a.use_multi_copy)
         return name, status, model, table
 

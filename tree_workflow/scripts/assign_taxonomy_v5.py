@@ -6,7 +6,7 @@ Inputs (via snakemake):
   red_cutoffs     JSON mapping rank -> median RED (phylorank ``.dict`` file)
   taxonomy        headerless TSV ``genome_id<TAB>taxonomy`` (database labels)
 
-Outputs (TSV with header ``genome_id<TAB>taxonomy``):
+Outputs (TSV with header ``genome_id<TAB>taxonomy<TAB>novelty``; novelty = known / species / genus / ... / phylum):
   reference_taxonomy   leaves that had a database taxonomy
   target_taxonomy      leaves without one (new genomes), with placeholder names
 
@@ -70,6 +70,24 @@ def parse_tax(tax_str):
                     parsed[rank] = value
                 break
     return parsed
+
+
+NOVELTY_RANKS = RANKS[1:]   # domain is never a placeholder
+
+
+def novelty_of(assigned):
+    """How new a leaf's lineage is: the highest rank such that it and every rank below it is a new (placeholder) taxon.
+
+    ``known`` when the species itself has a database name; ``species`` when only the species is new; ... ``phylum`` when
+    everything from phylum down is new. Replaces the old re-parsing of placeholder names from the lineage string.
+    """
+    novelty = "known"
+    for rank in reversed(NOVELTY_RANKS):
+        if isinstance(assigned.get(rank), Placeholder):
+            novelty = rank
+        else:
+            break
+    return novelty
 
 
 def format_tax(tax):
@@ -395,7 +413,7 @@ def assign_top_down(tree, red_cutoffs, used_names):
         node.assigned = assigned
         if is_leaf:
             names = {rank: resolve_name(assigned[rank], counters, used_names) for rank in RANKS if rank in assigned}
-            leaf_row = {"genome_id": node.genome_id, "taxonomy": format_tax(names)}
+            leaf_row = {"genome_id": node.genome_id, "taxonomy": format_tax(names), "novelty": novelty_of(assigned)}
             (target if node.is_target else reference).append(leaf_row)
 
     return reference, target, mixed_nodes
@@ -489,7 +507,7 @@ def write_mixed_nodes(rows, path):
 
 
 def write_rows(rows, path):
-    schema = {"genome_id": pl.Utf8, "taxonomy": pl.Utf8}
+    schema = {"genome_id": pl.Utf8, "taxonomy": pl.Utf8, "novelty": pl.Utf8}
     pl.DataFrame(rows, schema=schema).write_csv(path, separator="\t")
 
 

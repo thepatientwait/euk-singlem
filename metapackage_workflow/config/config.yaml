@@ -36,6 +36,9 @@ jgi_config:
 busco:
   lineage: eukaryota_odb12
   mode: genome
+  # Run BUSCO in the job's scratch dir and keep only full_table, summaries and three condensed files per genome
+  # (proteins.faa.gz, models.gff.gz, cds.fna.gz; scripts/busco_run.py) instead of ~540 files / 170 MB. See busco_run.py.
+  condense: true
   quality_control:
     min_complete_markers: 40
     # Include Duplicated BUSCO genes, represented by their top-scoring copy (one sequence per
@@ -56,6 +59,15 @@ ncbi:
   reference_only: false
   include_metazoa_viridiplantae_refs: true
 
+# NCBI TSA transcriptomes (scripts/discover_tsa.py). Genomes are trusted more than transcriptomes, so
+# by default only taxa without a genome are added.
+tsa:
+  enabled: true
+  only_novel_taxa: true
+  novel_level: species   # species (name or tax ID covered by a genome) | taxid
+  min_size_mb: 5         # compressed size of the bulk file(s); drops tiny assemblies
+  max_projects: 0        # 0 = all (use a small number to test)
+
 # SingleM configuration
 singlem:
   target_domains: 'Eukaryota'
@@ -63,8 +75,15 @@ singlem:
   allow_missing_taxonomy: false  # true keeps sequences/genomes without a usable taxonomy
   derep:
     enabled: false
+    # galah + skani on the marker-gene CDS of each genome (scripts/extract_marker_cds.py)
     precluster_ani: 90
-    ani: 95
+    ani: 97                    # marker-CDS ANI runs higher than whole-genome ANI: 97 here matches coverm 95 on whole genomes (ARI 0.986, 1303 genomes)
+    min_aligned_fraction: 15   # percent of the marker CDS that must align; marker CDS are only ~100-400 kb
+    precluster_method: skani
+    cluster_method: skani
+    # Points taken off a transcriptome's BUSCO completeness in the quality report, so a genome is the
+    # representative whenever one shares its cluster
+    tsa_quality_penalty: 50
   # Introns. SingleM windows are matched against metagenomic DNA reads, which cannot cross an
   # intron, so a window that spans one is not recoverable from the genomes that have it.
   # Two metapackage variants (wildcard `introns`):

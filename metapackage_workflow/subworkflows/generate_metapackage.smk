@@ -28,7 +28,10 @@ configfile: str(PATHS_CONFIG_PATH)
 
 # workflow
 GROUPS       = config["groups"]
-BUSCO_GROUPS = GROUPS + ["p10k", "ncbi"]
+BUSCO_GROUPS = GROUPS + ["p10k", "ncbi", "tsa"]
+# Groups that are transcriptomes: BUSCO runs in transcriptome mode (MetaEuk), whose full table has no gene
+# coordinates (see scripts/busco_table.py), and they have no introns to survey.
+TRANSCRIPTOME_GROUPS = {"tsa"}
 DOWNLOAD     = config["download"]
 BUSCO        = config["generate"]["busco"]
 SINGLEM      = config["generate"]["singlem"]
@@ -111,6 +114,10 @@ BUSCO_DOWNLOAD_PATH = str((ROOT / "busco_downloads").resolve())
 BUSCO_LINEAGE_READY = str((ROOT / "outputs" / "metadata" / f".busco_lineage_{config['busco']['lineage']}.ready").resolve())
 
 BUSCO_RESULTS_FROM_MANIFEST = build_busco_targets_from_manifest(DOWNLOAD["manifest"]["genome"])
+MARKER_CDS = config["generate"]["derep"]["marker_cds"]
+# marker CDS of every genome in the QC manifest, for dereplicate_genomes
+MARKER_CDS_FROM_MANIFEST = get_genomes_with_transcripts_factory(
+    BUSCO["quality_control_results"], MARKER_CDS, genome_manifest=DOWNLOAD["manifest"]["genome"])
 GENOMES_WITH_TRANSCRIPTS = get_genomes_with_transcripts_factory(
     SURVEY_MANIFEST, TRANSCRIPTS["taxonomy_otu"],
     genome_manifest=DOWNLOAD["manifest"]["genome"] if SUBSET == "none" else None)
@@ -235,10 +242,11 @@ rule run_busco:
         full_table = BUSCO["full_table"]
     params:
         lineage      = config["busco"]["lineage"],
-        mode         = config["busco"]["mode"],
+        mode         = lambda wildcards: "transcriptome" if wildcards.group in TRANSCRIPTOME_GROUPS else config["busco"]["mode"],
         out_path_dir = lambda wildcards: BUSCO["output_dir"].format(group=wildcards.group),
         download_path = BUSCO_DOWNLOAD_PATH,
         offline       = True,
+        condense      = bool(config["busco"].get("condense", True)),
     threads: config["resources"]["busco_threads"]
     retries: TOTAL_ATTEMPTS
     resources: **BUSCO_RESOURCES
@@ -292,6 +300,8 @@ rule build_checkm2_quality_report:
         busco_manifest = BUSCO["quality_control_results"]
     output:
         report = config["generate"]["quality_report"]["checkm2_style"]
+    params:
+        tsa_penalty = config["singlem"]["derep"].get("tsa_quality_penalty", 0)
     retries: TOTAL_ATTEMPTS
     # resources: **DEFAULT_RESOURCES
     resources:
@@ -303,25 +313,48 @@ rule build_checkm2_quality_report:
         str(SCRIPTS_DIR / "build_checkm2_quality_report.py")
 
 
+rule extract_marker_cds:
+    """Spliced CDS of a genome's (or transcriptome's) BUSCO marker genes: the sequence it is dereplicated on."""
+    input:
+        genome     = DOWNLOAD["genomes"]["by_group"],
+        full_table = BUSCO["full_table"]
+    output:
+        cds = MARKER_CDS
+    threads: 1
+    retries: TOTAL_ATTEMPTS
+    resources: **DEFAULT_RESOURCES
+    wildcard_constraints:
+        group = "|".join(BUSCO_GROUPS)
+    log:
+        log_path("extract_marker_cds", "group", "genome_acc")
+    script:
+        str(SCRIPTS_DIR / "extract_marker_cds.py")
+
+
 checkpoint dereplicate_genomes:
-    """Dereplicate genomes using coverm cluster and emit a filtered BUSCO manifest."""
+    """Dereplicate genomes and transcriptomes with galah on marker CDS and emit a filtered BUSCO manifest."""
     input:
         quality_report = config["generate"]["quality_report"]["checkm2_style"],
-        busco_manifest = BUSCO["quality_control_results"]
+        busco_manifest = BUSCO["quality_control_results"],
+        marker_cds = MARKER_CDS_FROM_MANIFEST
     output:
         clusters = config["generate"]["derep"]["cluster_definitions"],
         representatives = config["generate"]["derep"]["representatives"],
         filtered_manifest = config["generate"]["derep_manifest"]["busco_filtered"]
     params:
         precluster_ani = config["singlem"]["derep"]["precluster_ani"],
-        ani = config["singlem"]["derep"]["ani"]
+        ani = config["singlem"]["derep"]["ani"],
+        min_aligned_fraction = config["singlem"]["derep"]["min_aligned_fraction"],
+        precluster_method = config["singlem"]["derep"]["precluster_method"],
+        cluster_method = config["singlem"]["derep"]["cluster_method"],
+        cds_template = lambda wildcards: MARKER_CDS
     threads: config["resources"]["coverm_cluster_threads"]
     retries: TOTAL_ATTEMPTS
     resources: **RESOURCE_PROFILE(mem_scale=50, runtime="4h")
     log:
         log_path("dereplicate_genomes")
     conda:
-        env("coverm")
+        env("galah")
     script:
         str(SCRIPTS_DIR / "dereplicate_genomes.py")
 

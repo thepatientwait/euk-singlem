@@ -13,6 +13,7 @@ from helpers import (
     create_resource_profile_factory,
     create_dirs,
     load_external_genome_map,
+    unresolved_genome_paths,
     load_valid_genes,
     log_path,
     pixi_env,
@@ -124,6 +125,14 @@ EXTERNAL_GENOME_MAP = load_external_genome_map(
     external_manifest=EXTERNAL_MANIFEST,
     external_config=EXTERNAL_CONFIG,
 )
+
+# Metapackage genomes without a usable taxonomy (tax_status unresolved, e.g. p10k "Eukaryota sp.") never reach the
+# per-gene FASTAs the tree reads (the metapackage aggregation drops them), so they go through the external route and
+# enter the tree as targets. A path already listed under external: wins.
+if EXTERNAL_ENABLED and bool(EXTERNAL_CONFIG.get("include_unresolved", False)):
+    for _acc, _path in unresolved_genome_paths(
+            METAPACKAGE_TAXONOMY, Path(METAPACKAGE_CONFIG["genome_manifest"]), METAPACKAGE_ROOT).items():
+        EXTERNAL_GENOME_MAP.setdefault(_acc, _path)
 
 OUTGROUP_ENABLED = bool(OUTGROUP_CONFIG.get("enabled", False))
 # Outgroup (Asgard) accessions to drop from the concatenated alignment when the outgroup is disabled,
@@ -285,6 +294,7 @@ rule run_external_busco:
         out_path_dir = lambda wildcards: EXTERNAL_PATHS["busco"]["outdir"].format(group=wildcards.group),
         download_path = BUSCO_DOWNLOAD_PATH,
         offline       = True,
+        condense      = bool(BUSCO_CONFIG.get("condense", True)),
     threads: int(RESOURCE_CONFIG.get("busco_threads", 8))
     retries: TOTAL_ATTEMPTS
     resources: **BUSCO_RESOURCES
@@ -982,7 +992,9 @@ rule label_masking:
 rule generate_metadata:
     input:
         reference_taxonomy = TAXONOMY_PATHS["reference"],
-        target_taxonomy = TAXONOMY_PATHS["target"]
+        target_taxonomy = TAXONOMY_PATHS["target"],
+        # download source (group) of every genome, for the source_group column
+        busco_manifests = [str(METAPACKAGE_BUSCO_QC)] + ([EXTERNAL_PATHS["metadata"]["busco_qc"]] if USE_EXTERNAL else [])
     output:
         metadata = TAXONOMY_PATHS["metadata"]
     retries: TOTAL_ATTEMPTS

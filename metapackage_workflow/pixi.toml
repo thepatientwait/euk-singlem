@@ -49,9 +49,9 @@ graftm = "*"
 python = "3.12.*"
 busco = ">=5"
 
-# genome dereplication (dereplicate_genomes calls `coverm cluster`)
-[feature.coverm.dependencies]
-coverm = "0.7.*"
+# genome dereplication on marker CDS (dereplicate_genomes calls `galah cluster`, skani ANI)
+[feature.galah.dependencies]
+galah = "0.4.*"
 
 # executed notebooks (rule intron_survey_notebook)
 [feature.notebook.dependencies]
@@ -70,5 +70,5 @@ default = { solve-group = "all" }
 singlem = { features = ["singlem"], no-default-feature = true }
 graftm  = { features = ["graftm"],  no-default-feature = true }
 busco   = { features = ["busco"],   no-default-feature = true }
-coverm  = { features = ["coverm"],  no-default-feature = true }
+galah   = { features = ["galah"],   no-default-feature = true }
 notebook = { features = ["notebook"], no-default-feature = true }

@@ -22,7 +22,7 @@ Two subworkflows, run separately (config lives in `metapackage_workflow/config/`
 
 ```bash
 cd metapackage_workflow
-pixi install --all   # once: the snakemake driver (default) + per-rule envs (singlem, graftm, busco, coverm, notebook)
+pixi install --all   # once: the snakemake driver (default) + per-rule envs (singlem, graftm, busco, galah, notebook)
 
 # phase 1: metadata + genome download (JGI / NCBI / P10K -> unified manifest)
 pixi run snakemake --profile ~/git/hpc_scripts/snakemake_configs/aqua --use-conda \
@@ -60,6 +60,34 @@ Notes:
   for rules without wildcards. Logs are overwritten each time a job runs. The raw PBS
   `.OU`/`.ER` files still go to `~/qsub_logs` (check those for jobs killed before they
   wrote anything, e.g. out of memory).
+
+- **TSA transcriptomes.** NCBI Transcriptome Shotgun Assembly projects are added as group `tsa` (config `tsa:`).
+  `discover_tsa` (checkpoint, `scripts/discover_tsa.py`) queries Entrez for non-Metazoa/Viridiplantae `tsa-master`
+  records (lineage re-checked), drops taxa a genome already covers (`only_novel_taxa`, judged by species name or tax ID,
+  `novel_level`), looks up NCBI's bulk files (`genbank/tsa/<letter>/tsa.<PREFIX>.<n>.fsa_nt.gz`), keeps the largest
+  project per tax ID above `min_size_mb`, and writes `outputs/metadata/source/tsa/tsa_projects.tsv`.
+  `download_tsa` fetches the parts (Content-Length + gzip check; NCBI publishes no md5) into
+  `outputs/genomes/tsa/<master accession>.fasta.gz`. TSA enters the unified manifest, taxonomy fetch and
+  `tax_status` gate like any genome. The taxonomy mapping is read by path (it depends on this rule), so run
+  `--forcerun discover_tsa` after it changes. In phase 2 BUSCO runs in `transcriptome` mode for group `tsa`
+  (MetaEuk; its `full_table.tsv` has no `Gene Start/End/Strand`, handled by `scripts/busco_table.py`);
+  `extract_transcripts` writes the MetaEuk CDS (no introns to cut), and TSA is excluded from the intron survey.
+  TSA proteins reach the per-gene FASTAs, and so the tree, when their taxonomy is `complete` or `partial`.
+- **Dereplication** (`dereplicate_genomes`, used by the tree's `derep` mode and optionally the metapackage) runs
+  `galah cluster` (skani) on each genome's **marker CDS** (rule `extract_marker_cds`: spliced CDS of the Complete and
+  best Duplicated BUSCO genes), so genomes and transcriptomes compare on the same sequence. Marker-CDS ANI runs higher
+  than whole-genome ANI: `ani: 97` reproduces the old coverm 95% clusters (ARI 0.986 on 1,303 genomes; 590 vs 600
+  clusters). Transcriptomes lose `tsa_quality_penalty` completeness points in the quality report, so a genome is the
+  representative whenever one shares the cluster.
+
+- **BUSCO result size.** BUSCO itself leaves ~540 files / ~340 MB per genome (a 167 MB miniprot index, 120 MB of logs, a
+  copy of the lineage proteins). `run_busco` therefore runs BUSCO in the job's scratch dir (`TMPDIR`) and keeps, per genome,
+  `full_table.tsv`, the short summaries, `busco.log` and three condensed files (`proteins.faa.gz`, `models.gff.gz`, and
+  `cds.fna.gz` for transcriptomes), about 0.2 MB in all (`busco.condense: true`). Nothing is lost: FASTA headers and GFF lines
+  carry the gene id. `scripts/busco_run.py` (`BuscoRun`) reads both layouts, so code, tests and old results keep working.
+  Condense results that already exist with `python scripts/condense_busco_runs.py outputs/busco` (report only) and
+  `... --apply` (does it; run it from your login shell or `mqsub`). Changing `run_busco.py` or its params makes Snakemake want
+  to rerun BUSCO: use `--rerun-triggers mtime` as for other code edits.
 
 - **JGI downloads.** Files on JGI tape (`PURGED`) must be restored by JGI first (up to ~24 h).
   `jgi_request_restore` sends one batched request per group; every missing genome then gets
@@ -180,6 +208,17 @@ PhyloRank's RED is a median over rootings, which can make some branch lengths ne
 child sit below its parent. `phylorank_red` therefore post-processes the RED trees with
 `scripts/monotone_red_tree.py` (RED made non-decreasing from root to tip, branch lengths recomputed, raw trees kept as
 `*.phylorank_raw.tree`); `assign_taxonomy` keeps its own guard and warns if it ever has to raise a node.
+
+**Source groups.** `tree_metadata.tsv` has a `source_group` column (fungi, algae, p10k, ncbi, tsa, external; `unknown` if a genome
+is in no BUSCO QC manifest), and `tree_accuracy` / `tree_diagnostics` break misplaced tips and genes per genome down by it, so
+transcriptome (`tsa`) tips can be judged separately from genome tips (`scripts/source_groups.py`).
+
+**Unresolved genomes as targets.** With `external.include_unresolved: true` the metapackage genomes whose `tax_status` is
+`unresolved` (no usable lineage, e.g. 263 p10k "Eukaryota sp.") are added to the external genomes (`helpers.unresolved_genome_paths`,
+read from `genomes_to_process.paths` and `taxonomy_mapping.tsv`; transcriptomes are skipped because the external route runs BUSCO in
+genome mode). They are BUSCO'd again here, aggregated with `allow_missing_taxonomy` and enter the tree as targets named from their
+neighbours; the metapackage still drops their sequences. When checking the DAG with `-n`, include the `input` rerun trigger
+(`--rerun-triggers input mtime`): with `mtime` alone Snakemake does not cascade the new BUSCO jobs to their consumers.
 
 Config: `config.yaml` (metapackage inputs, `external` genomes, `outgroup`,
 BUSCO, EukCC, alignment, taxonomy) and `paths.yaml`. Example inputs are

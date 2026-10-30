@@ -7,7 +7,8 @@ Inputs BUSCO quality control manifest + short_summary JSON files, outputs:
         Completeness_Specific | Completeness_Model_Used]
 
 Where:
-    - Name = genome_acc.fasta (must match CoverM's file_stem for .fasta.gz files)
+    - Name = genome_acc.fasta and genome_acc (galah/CoverM match the file stem of <acc>.fasta.gz; the
+      two spellings cover the stem conventions of different builds)
     - Completeness_General = (complete_count / n_markers) * 100
     - Contamination = 0
     - Completeness_Specific = 0
@@ -26,6 +27,8 @@ from log_config import configure_logger
 
 logger_name = os.path.splitext(os.path.basename(__file__))[0]
 logger = configure_logger(logger_name)
+
+TRANSCRIPTOME_GROUPS = {"tsa"}
 
 try:
     snakemake  # type: ignore[name-defined]
@@ -66,11 +69,23 @@ def _read_short_summary(json_path: Path) -> Optional[Dict]:
         return None
 
 
+def adjusted_completeness(group: str, completeness: float, penalty: float, penalised_groups) -> float:
+    """BUSCO completeness, minus ``penalty`` points for transcriptome groups (floored at 0).
+
+    The dereplication picks the highest-quality member of a cluster as its representative; the penalty
+    makes a genome win over a transcriptome of the same species.
+    """
+    if group in penalised_groups and penalty:
+        return max(0.0, completeness - penalty)
+    return completeness
+
+
 def main() -> None:
     if snakemake is None:
         raise RuntimeError("This script is intended to be run by Snakemake")
 
     busco_manifest = Path(snakemake.input.busco_manifest)
+    TSA_PENALTY = float(getattr(snakemake.params, "tsa_penalty", 0) or 0)
     output_file = Path(snakemake.output.report)
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -144,7 +159,11 @@ def main() -> None:
                     genome_acc,
                 )
 
+        completeness = adjusted_completeness(group, completeness, TSA_PENALTY, TRANSCRIPTOME_GROUPS)
+        # galah matches the genome file stem against Name; builds differ on whether the stem keeps ".fasta"
+        # (<acc>.fasta.gz -> "<acc>.fasta" or "<acc>"), so both spellings are listed
         quality_records.append((f"{genome_acc}.fasta", completeness, contamination))
+        quality_records.append((genome_acc, completeness, contamination))
 
     logger.info(
         "Processed %d genomes: %d quality records, "
