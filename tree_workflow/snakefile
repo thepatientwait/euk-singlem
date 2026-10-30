@@ -982,7 +982,9 @@ rule label_masking:
 rule generate_metadata:
     input:
         reference_taxonomy = TAXONOMY_PATHS["reference"],
-        target_taxonomy = TAXONOMY_PATHS["target"]
+        target_taxonomy = TAXONOMY_PATHS["target"],
+        # download source (group) of every genome, for the source_group column
+        busco_manifests = [str(METAPACKAGE_BUSCO_QC)] + ([EXTERNAL_PATHS["metadata"]["busco_qc"]] if USE_EXTERNAL else [])
     output:
         metadata = TAXONOMY_PATHS["metadata"]
     retries: TOTAL_ATTEMPTS

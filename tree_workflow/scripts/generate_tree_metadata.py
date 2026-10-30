@@ -5,6 +5,7 @@ from pathlib import Path
 import polars as pl
 
 from log_redirect import redirect_to_snakemake_log
+from source_groups import group_of, read_source_groups
 
 # send this rule's stdout/stderr to its log: file
 redirect_to_snakemake_log()
@@ -108,11 +109,16 @@ def main() -> None:
         novelty="novel",
     )
 
+    # download source of each genome (fungi, algae, p10k, ncbi, tsa, external, ...); "unknown" when a genome is in
+    # no BUSCO QC manifest. Lets the notebooks judge transcriptome (tsa) tips separately.
+    groups = read_source_groups(list(getattr(snakemake.input, "busco_manifests", []) or []))
+
     metadata = (
         pl.concat([reference, target], how="vertical_relaxed")
         .unique(subset=["genome_id"], keep="last")
         .pipe(expand_taxonomy)
         .pipe(determine_novelty)
+        .with_columns(pl.col("genome_id").map_elements(lambda g: group_of(g, groups), return_dtype=pl.String).alias("source_group"))
         .sort("genome_id")
     )
     
