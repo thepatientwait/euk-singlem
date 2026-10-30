@@ -50,12 +50,13 @@ def fetch_part(url: str, dest: Path) -> None:
             pass
 
 
-_ACC_RE = re.compile(r"(?:^>|\|gb\|)([A-Z]{4,6}\d{2,}\.\d+)")
+_ACC_RE = re.compile(r"^>(?:gi\|\d+\|)?(?:gb\|)?([A-Z]{4,6}\d{2,}\.\d+)")
 
 
 def header_accession(line: str) -> str:
-    """Contig accession of a FASTA header: ``>GLPS01000001.1 ...`` or the old ``>gi|760317201|gb|GBYM01000001.1| ...``."""
-    match = _ACC_RE.search(line.split()[0] if "|" not in line else line)
+    """Contig accession of a FASTA header. Three styles occur: ``>GLPS01000001.1 ...``,
+    ``>gb|GDKK01000001.1| ...`` and the oldest ``>gi|760317201|gb|GBYM01000001.1| ...``."""
+    match = _ACC_RE.match(line)
     return match.group(1) if match else ""
 
 

@@ -106,6 +106,8 @@ class TestDownload(unittest.TestCase):
     def test_old_gi_headers(self):
         self.assertEqual(dl.header_accession(">gi|760317201|gb|GBYM01000001.1| TSA: Coriolopsis gallica cotig_1"), "GBYM01000001.1")
         self.assertEqual(dl.header_accession(">GLPS01000001.1 TSA: x"), "GLPS01000001.1")
+        self.assertEqual(dl.header_accession(">gb|GDKK01000001.1| TSA: Colpodella angusta a1000007_3"), "GDKK01000001.1")
+        self.assertEqual(dl.header_accession(">unexpected header"), "")
         with tempfile.TemporaryDirectory() as tmp:
             part, out = Path(tmp) / "a.gz", Path(tmp) / "out.gz"
             with gzip.open(part, "wt") as h:
