@@ -46,6 +46,7 @@ outgroup:
 busco:
   lineage: "eukaryota_odb12"
   mode: "genome"
+  condense: true   # keep full_table + 3 condensed files per genome (see metapackage_workflow/scripts/busco_run.py)
   min_complete_markers: 20
   # Include Duplicated BUSCO genes, each represented by its top-scoring copy (one sequence per
   # gene per genome). Keep equal to busco.quality_control.use_multi_copy of the metapackage

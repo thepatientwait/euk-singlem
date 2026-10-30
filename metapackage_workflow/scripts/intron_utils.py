@@ -51,12 +51,12 @@ class Model:
         return sorted(self.exons, reverse=(self.strand == "-"))
 
 
-def parse_gff(path: Path) -> List[Model]:
-    """Read the gene models of a miniprot GFF (``mRNA`` + ``CDS`` lines linked by ``Parent``)."""
+def parse_gff_text(lines) -> List[Model]:
+    """Gene models from the lines of a miniprot GFF (``mRNA`` + ``CDS`` lines linked by ``Parent``)."""
     models: Dict[str, Model] = {}
     order: List[str] = []
-    for line in Path(path).read_text().splitlines():
-        parts = line.split("\t")
+    for line in lines:
+        parts = line.rstrip("\n").split("\t")
         if len(parts) < 9:
             continue
         feature = parts[2]
@@ -72,6 +72,11 @@ def parse_gff(path: Path) -> List[Model]:
                 if "Frameshift" in attrs or "StopCodon" in attrs:
                     models[parent].irregular = True
     return [models[i] for i in order if models[i].exons]
+
+
+def parse_gff(path: Path) -> List[Model]:
+    """Read the gene models of a miniprot GFF file (see :func:`parse_gff_text`)."""
+    return parse_gff_text(Path(path).read_text().splitlines())
 
 
 def cds_matches_protein(model: Model, cds_len: int, protein_len: int) -> bool:

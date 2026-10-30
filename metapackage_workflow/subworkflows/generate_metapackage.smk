@@ -246,6 +246,7 @@ rule run_busco:
         out_path_dir = lambda wildcards: BUSCO["output_dir"].format(group=wildcards.group),
         download_path = BUSCO_DOWNLOAD_PATH,
         offline       = True,
+        condense      = bool(config["busco"].get("condense", True)),
     threads: config["resources"]["busco_threads"]
     retries: TOTAL_ATTEMPTS
     resources: **BUSCO_RESOURCES

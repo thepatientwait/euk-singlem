@@ -14,7 +14,7 @@ so a window that spans one is never observed in reads. Two modes (wildcard ``int
 
 Transcriptomes (BUSCO transcriptome mode, group ``tsa``) are already spliced: there are no introns to cut at,
 and the table has no gene model. For them the MetaEuk coding sequence BUSCO wrote
-(``busco_sequences/*/<gene>.fna``) is written as one record per gene, in both modes.
+(``<gene>.fna``, see ``busco_run.py``) is written as one record per gene, in both modes.
 
 Exons separated by less than ``min_intron`` nt are frameshift/indel artefacts rather than
 introns and stay together. Blocks shorter than ``min_exon_nt`` cannot hold a window and are
@@ -35,6 +35,7 @@ sys.path.append(str(Path(__file__).parent))
 from log_config import configure_logger
 import intron_utils as iu
 from busco_table import match_record, read_full_table
+from busco_run import BuscoRun
 
 logger = configure_logger(__file__)
 
@@ -110,18 +111,17 @@ def gene_span_record(busco_id: str, row: dict, genome: Dict[str, SeqRecord]) -> 
     return SeqRecord(seq, id=busco_id, description=f"{row['Sequence']}:{lo}-{hi} strand {row['Strand']} (gene span)")
 
 
-def transcript_cds_record(busco_id: str, row: dict, seq_dir: Path) -> Optional[SeqRecord]:
+def transcript_cds_record(busco_id: str, row: dict, run: BuscoRun) -> Optional[SeqRecord]:
     """The coding sequence BUSCO (MetaEuk) found in a transcript for one Complete gene, or None."""
-    fna = seq_dir / f"{busco_id}.fna"
-    if not fna.exists():
+    records = run.cds_records(busco_id)
+    if not records:
         return None
-    records = list(SeqIO.parse(fna, 'fasta'))
     record = match_record(records, str(row['Sequence']), row['Gene Start'], row['Gene End'], row.get('Strand'), set())
     if record is None and len(records) == 1:
         record = records[0]
     if record is None:
         return None
-    return SeqRecord(record.seq, id=f"{busco_id}|exon1of1", description=f"{row['Sequence']}:{row['Gene Start']}-{row['Gene End']} (transcript CDS)")
+    return SeqRecord(Seq(record.seq), id=f"{busco_id}|exon1of1", description=f"{row['Sequence']}:{row['Gene Start']}-{row['Gene End']} (transcript CDS)")
 
 
 def extract_busco_transcripts(genome_file, full_table_file, output_file,
@@ -142,8 +142,8 @@ def extract_busco_transcripts(genome_file, full_table_file, output_file,
         return 0
 
     if bool(complete_genes['Transcriptome'][0]):
-        seq_dir = full_table.parent / "busco_sequences" / "single_copy_busco_sequences"
-        records = [r for r in (transcript_cds_record(str(row['Busco id']), row, seq_dir)
+        run = BuscoRun(full_table.parent)
+        records = [r for r in (transcript_cds_record(str(row['Busco id']), row, run)
                                for row in complete_genes.iter_rows(named=True)) if r is not None]
         logger.info(f"{group}/{genome_acc}: transcriptome, {len(records)} of {len(complete_genes)} complete genes written as CDS")
         with open(output_path, 'w') as handle:
@@ -151,7 +151,7 @@ def extract_busco_transcripts(genome_file, full_table_file, output_file,
         return len(records)
 
     genome = load_genome_sequences(genome_file)
-    gff_dir = full_table.parent / "busco_sequences" / "single_copy_busco_sequences"
+    run = BuscoRun(full_table.parent)
     records, no_model, with_introns, short_total = [], 0, 0, 0
 
     for row in complete_genes.iter_rows(named=True):
@@ -163,8 +163,7 @@ def extract_busco_transcripts(genome_file, full_table_file, output_file,
             else:
                 records.append(record)
             continue
-        gff = gff_dir / f"{busco_id}.gff"
-        models = iu.parse_gff(gff) if gff.exists() else []
+        models = run.gff_models(busco_id)
         model = iu.select_model(models, str(row['Sequence']), int(row['Gene Start']), int(row['Gene End']),
                                 str(row['Strand'])) or (models[0] if len(models) == 1 else None)
         if model is None:

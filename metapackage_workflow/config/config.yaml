@@ -36,6 +36,9 @@ jgi_config:
 busco:
   lineage: eukaryota_odb12
   mode: genome
+  # Run BUSCO in the job's scratch dir and keep only full_table, summaries and three condensed files per genome
+  # (proteins.faa.gz, models.gff.gz, cds.fna.gz; scripts/busco_run.py) instead of ~540 files / 170 MB. See busco_run.py.
+  condense: true
   quality_control:
     min_complete_markers: 40
     # Include Duplicated BUSCO genes, represented by their top-scoring copy (one sequence per

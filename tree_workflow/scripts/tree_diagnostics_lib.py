@@ -11,10 +11,15 @@ Questions answered, all from the concatenated alignment, its partitions and the 
 """
 import random
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+
+# BUSCO run directories (original per-gene files or condensed) are read with the metapackage workflow's reader
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "metapackage_workflow" / "scripts"))
+from busco_run import BuscoRun  # noqa: E402
 
 from tree_fragmentation import RANKS, read_taxonomy  # noqa: F401  (re-exported)
 
@@ -236,10 +241,10 @@ def duplicated_cases(full_table):
 
 def copy_sequences(full_table, busco_id, rows):
     """Protein sequence of each Duplicated row (same matching rule as the aggregation)."""
-    seq_file = Path(full_table).parent / "busco_sequences" / "multi_copy_busco_sequences" / f"{busco_id}.faa"
-    if not seq_file.exists():
+    found_records = BuscoRun(Path(full_table).parent).protein_records(busco_id)
+    if not found_records:
         return None
-    records = read_fasta(seq_file)
+    records = {r.description: r.seq for r in found_records}
     sequences, used = [], set()
     for row in rows:
         try:

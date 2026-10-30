@@ -80,6 +80,15 @@ Notes:
   clusters). Transcriptomes lose `tsa_quality_penalty` completeness points in the quality report, so a genome is the
   representative whenever one shares the cluster.
 
+- **BUSCO result size.** BUSCO itself leaves ~540 files / ~340 MB per genome (a 167 MB miniprot index, 120 MB of logs, a
+  copy of the lineage proteins). `run_busco` therefore runs BUSCO in the job's scratch dir (`TMPDIR`) and keeps, per genome,
+  `full_table.tsv`, the short summaries, `busco.log` and three condensed files (`proteins.faa.gz`, `models.gff.gz`, and
+  `cds.fna.gz` for transcriptomes), about 0.2 MB in all (`busco.condense: true`). Nothing is lost: FASTA headers and GFF lines
+  carry the gene id. `scripts/busco_run.py` (`BuscoRun`) reads both layouts, so code, tests and old results keep working.
+  Condense results that already exist with `python scripts/condense_busco_runs.py outputs/busco` (report only) and
+  `... --apply` (does it; run it from your login shell or `mqsub`). Changing `run_busco.py` or its params makes Snakemake want
+  to rerun BUSCO: use `--rerun-triggers mtime` as for other code edits.
+
 - **JGI downloads.** Files on JGI tape (`PURGED`) must be restored by JGI first (up to ~24 h).
   `jgi_request_restore` sends one batched request per group; every missing genome then gets
   a `download_jgi_genome` job that polls JGI every `jgi_poll_minutes` (15) and downloads as

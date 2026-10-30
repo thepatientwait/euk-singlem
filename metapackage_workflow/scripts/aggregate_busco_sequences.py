@@ -13,6 +13,7 @@ from joblib import Parallel, delayed
 sys.path.append(str(Path(__file__).parent))
 from log_config import configure_logger
 from busco_table import match_record, read_full_table
+from busco_run import BuscoRun
 
 # Configure logger
 logger = configure_logger(__file__)
@@ -101,36 +102,26 @@ def extract_gene_sequences(busco_file: Path, selected_genes: pl.DataFrame,
     Returns:
         Dictionary mapping busco_id to sequence information
     """
-    seq_dirs = [
-        busco_file.parent / "busco_sequences" / "single_copy_busco_sequences",
-        busco_file.parent / "busco_sequences" / "multi_copy_busco_sequences",
-    ]
-    
-    existing_seq_dirs = [seq_dir for seq_dir in seq_dirs if seq_dir.exists()]
-    if not existing_seq_dirs:
-        raise FileNotFoundError(f"Sequences directories not found: {seq_dirs}")
-    
+    run = BuscoRun(busco_file.parent)
+    if run.layout == "none":
+        raise FileNotFoundError(f"No BUSCO sequences (busco_sequences/ or proteins.faa.gz) next to {busco_file}")
+
     gene_data = {}
     sequences_found = 0
-    
+
     for busco_id in selected_genes['Busco id'].unique().to_list():
-        seq_file = next(
-            (seq_dir / f"{busco_id}.faa" for seq_dir in existing_seq_dirs
-             if (seq_dir / f"{busco_id}.faa").exists()),
-            None,
-        )
-        if seq_file is None:
+        records = run.protein_records(busco_id)
+        if not records:
             logger.debug(f"Sequence file not found for {busco_id}")
             continue
 
-        records = list(SeqIO.parse(seq_file, 'fasta'))
         busco_rows = selected_genes.filter(pl.col('Busco id') == busco_id)
         used_record_ids = set()
 
         for copy_number, row in enumerate(busco_rows.iter_rows(named=True), start=1):
             record = _match_busco_record(records, row, used_record_ids)
             if record is None:
-                logger.warning(f"No FASTA record matched {busco_id} copy {copy_number} in {seq_file}")
+                logger.warning(f"No FASTA record matched {busco_id} copy {copy_number} in {busco_file.parent}")
                 continue
 
             used_record_ids.add(record.id)
