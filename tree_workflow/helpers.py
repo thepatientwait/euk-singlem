@@ -106,6 +106,39 @@ def load_external_genome_map(
     return dict(sorted(mapping.items()))
 
 
+def unresolved_genome_paths(
+    taxonomy_mapping: Path,
+    genome_manifest: Path,
+    base_dir: Path,
+    exclude_groups: tuple = ("tsa",),
+) -> dict[str, str]:
+    """``{accession: absolute genome path}`` of the metapackage genomes whose ``tax_status`` is ``unresolved``.
+
+    These genomes have no usable database lineage, so the metapackage's aggregation drops their sequences and the
+    per-gene FASTAs the tree reads never contain them. Sending them through the external route (BUSCO, aggregation
+    with ``allow_missing_taxonomy``) puts them in the tree as targets, named from their neighbours.
+
+    ``genome_manifest`` is the metapackage's ``genomes_to_process.paths`` (one path per line, relative to
+    ``base_dir``, the metapackage workflow directory). Genomes of ``exclude_groups`` (the directory under
+    ``outputs/genomes``) are skipped: transcriptomes (``tsa``) need BUSCO's transcriptome mode, which the external
+    route does not use. Missing files give an empty result.
+    """
+    taxonomy_mapping, genome_manifest = Path(taxonomy_mapping), Path(genome_manifest)
+    if not taxonomy_mapping.exists() or not genome_manifest.exists():
+        return {}
+    mapping = pl.read_csv(taxonomy_mapping, separator="\t", infer_schema_length=0)
+    if not {"acc", "tax_status"} <= set(mapping.columns):
+        return {}
+    unresolved = set(mapping.filter(pl.col("tax_status") == "unresolved")["acc"].to_list())
+    found = {}
+    for line in read_nonempty_lines(genome_manifest):
+        path = Path(line)
+        acc = genome_acc_from_path(line)
+        if acc in unresolved and path.parent.name not in exclude_groups:
+            found[acc] = str(path if path.is_absolute() else Path(base_dir) / path)
+    return dict(sorted(found.items()))
+
+
 def build_external_busco_targets_factory(external_paths: dict, external_group: str, external_accessions: list[str], use_external: bool):
     def external_busco_targets(_wildcards):
         if not use_external:

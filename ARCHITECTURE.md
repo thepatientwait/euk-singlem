@@ -57,10 +57,12 @@ The `{introns}` wildcard (`corrected` | `naive`) is in package, metapackage and 
 | `scripts/label_masking.py` | Hide 15% of reference labels, re-assign, report recovery |
 | `scripts/copy_selection_lib.py`, `tree_accuracy_lib.py`, `tree_diagnostics_lib.py`, `tree_fragmentation.py` | Notebook computations |
 | `scripts/notebook_narrative.py`, `run_notebook.py` | Generated key findings/verdicts; nbconvert runner (moves tagged `findings-top` cells up) |
+| `scripts/source_groups.py` | genome -> download source (from the BUSCO QC manifests); `source_group` column, by-source notebook tables |
 | `scripts/publish_trees.py` | Copies finals to `~/trees/<date>/` with MANIFEST/RUN_INFO |
 | `notebooks/` | `tree_diagnostics`, `tree_accuracy`, `copy_selection` templates; `rendered/` executed copies |
 | `output/{derep}/{copies}/`, `output_subset_<name>/` | Results; four trees = `{all,derep}` x `{single,multi}` |
-| `tests/` | assign_taxonomy, monotone RED, label masking, copy selection, alignment, diagnostics, accuracy, publish, subset, narrative |
+| `helpers.py` | includes `unresolved_genome_paths` (unresolved metapackage genomes -> external genomes) |
+| `tests/` | source groups, unresolved genomes, assign_taxonomy, monotone RED, label masking, copy selection, alignment, diagnostics, accuracy, publish, subset, narrative |
 | `quick_dist.py`, `test_trimmed_alignment.faa`, `*_example.*` | Misc/example inputs |
 
 ## annotation_workflow/ (new, skeleton)

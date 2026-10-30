@@ -17,7 +17,7 @@ Last updated: 2026-10-28. Mark items done (move to `HISTORY.md` with a line) rat
 5. **TSA transcriptomes** (branch `transcripts`; code done, runs pending).
    - Run phase 1 (`download_data.smk`, no `--config` change needed; TSA is `tsa.enabled: true`): downloads 377 projects (~7 GB), regenerates the unified manifest, taxonomy and genome manifest. Then phase 2 runs BUSCO transcriptome mode on them.
    - Check after the first TSA BUSCO runs: completeness distribution, contamination/isoform redundancy (QC does not filter yet), and how many TSA taxa get `partial` or `unresolved` taxonomy.
-   - Flag TSA tips in the tree metadata/notebooks (not done): the notebooks do not read the BUSCO `group`, so TSA tips are not reported separately.
+   - TSA tips are flagged (`source_group`) and broken out in `tree_accuracy`/`tree_diagnostics` (done). Check the thresholds `TSA_EXCESS` and `TSA_GENES` against the first real run.
    - Intron status for TSA taxa is unknown by design (excluded from `intron_window`).
 6. **Derep with galah on marker CDS** (done, branch `transcripts`; full run pending). Rerun the validation on the full set after phase 2 (compare with `genome_clusters.tsv`, tune `ani` 97 and `min_aligned_fraction` 15). `enabled: false` still means the metapackage is not built from representatives; the tree's `derep` mode uses them.
 7. **Annotation workflow** (branch `annotation`; REMINDER: the user asked to finish the OrthoDB annotation change): confirm OrthoDB file names/URLs and sizes (403 from sandbox; user must test access), then gene calling (metaeuk vs EukProt, or eggNOG v7 OGs), `family5`-sized pilot (~200 genomes) checking the 129 BUSCO genes map to consistent OGs, then scale. Evaluation of eggNOG v7 euk coverage was not finished (`eggnog.db` timed out).
@@ -32,8 +32,9 @@ Last updated: 2026-10-28. Mark items done (move to `HISTORY.md` with a line) rat
 
 ## Housekeeping
 
+D-list reminder (ask the user to pick from items 8, 9, 13-19 once the A/B/C work below is finished).
+
 0. Merge `transcripts` and `annotation` branches into `feature/v2-ncbi-hybrid` when done.
-0b. Decision 4 (unresolved p10k as tree targets) is not effective: the tree reads taxonomy-gated per-gene FASTAs. Needs a separate ungated aggregation for the tree if wanted.
 
 13. Regenerate or retire `taxonomy_mapping.tsv`-dependent tree outputs (tree side still on the old schema until rerun).
 14. Simplify the regex re-parse of assign output strings in `tree_workflow/scripts/generate_tree_metadata.py`.

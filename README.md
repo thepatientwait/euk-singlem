@@ -200,6 +200,17 @@ child sit below its parent. `phylorank_red` therefore post-processes the RED tre
 `scripts/monotone_red_tree.py` (RED made non-decreasing from root to tip, branch lengths recomputed, raw trees kept as
 `*.phylorank_raw.tree`); `assign_taxonomy` keeps its own guard and warns if it ever has to raise a node.
 
+**Source groups.** `tree_metadata.tsv` has a `source_group` column (fungi, algae, p10k, ncbi, tsa, external; `unknown` if a genome
+is in no BUSCO QC manifest), and `tree_accuracy` / `tree_diagnostics` break misplaced tips and genes per genome down by it, so
+transcriptome (`tsa`) tips can be judged separately from genome tips (`scripts/source_groups.py`).
+
+**Unresolved genomes as targets.** With `external.include_unresolved: true` the metapackage genomes whose `tax_status` is
+`unresolved` (no usable lineage, e.g. 263 p10k "Eukaryota sp.") are added to the external genomes (`helpers.unresolved_genome_paths`,
+read from `genomes_to_process.paths` and `taxonomy_mapping.tsv`; transcriptomes are skipped because the external route runs BUSCO in
+genome mode). They are BUSCO'd again here, aggregated with `allow_missing_taxonomy` and enter the tree as targets named from their
+neighbours; the metapackage still drops their sequences. When checking the DAG with `-n`, include the `input` rerun trigger
+(`--rerun-triggers input mtime`): with `mtime` alone Snakemake does not cascade the new BUSCO jobs to their consumers.
+
 Config: `config.yaml` (metapackage inputs, `external` genomes, `outgroup`,
 BUSCO, EukCC, alignment, taxonomy) and `paths.yaml`. Example inputs are
 committed as `tree_metadata_example.tsv` and `trusted_taxa_example.txt`.

@@ -2,6 +2,8 @@ metapackage:
   singlem_input_dir: "../metapackage_workflow/outputs/singlem/input"
   valid_packages_manifest: "../metapackage_workflow/outputs/metadata/qc/valid_singlem_packages.txt"
   taxonomy_mapping: "../metapackage_workflow/outputs/metadata/taxonomy/taxonomy_mapping.tsv"
+  # genomes the metapackage processes (paths relative to the metapackage workflow); used to find unresolved genomes
+  genome_manifest: "../metapackage_workflow/outputs/metadata/manifests/genomes_to_process.paths"
   busco_qc: "../metapackage_workflow/outputs/metadata/qc/busco_quality_control_results.tsv"
   # genomes kept for the dereplicated tree (metapackage workflow rule dereplicate_genomes)
   derep_representatives: "../metapackage_workflow/outputs/metadata/qc/dereplicated_genome_representatives.txt"
@@ -32,6 +34,9 @@ external:
   cluster_table: "/work/microbiome/binchicken/DeepOceanEukaryotes/clusters/genome_clusters_95.tsv"
   cluster_base_dir: "/work/microbiome/binchicken/DeepOceanEukaryotes"
   ncbi_taxid_map: "inputs/external_genome_taxids.tsv"
+  # Also run the metapackage genomes with tax_status "unresolved" (no usable lineage; 263 p10k genomes) through
+  # this route, so the tree takes them as targets. Their sequences are dropped from the metapackage on purpose.
+  include_unresolved: true
 
 outgroup:
   enabled: false

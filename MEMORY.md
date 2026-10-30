@@ -32,7 +32,7 @@ submit via `snakemake_mqsub`, the user starts big runs.
 - Duplicated copy choice: peer similarity (`multi_copy_selection: peer`) with `min_gain` 0.02; falls back to top BUSCO score.
 - MIXED nodes above their rank's RED cutoff take the majority reference name (listed in `mixed_nodes.tsv`). Polyphyletic clade splitting stays **shelved**.
 - Reference database taxonomy names are never changed (asserted). Placeholders are `Eukarya_pN`.
-- 263 unresolved p10k genomes: tree targets only; excluded from the metapackage by `tax_status`.
+- 263 unresolved p10k genomes: tree targets only (routed through the external genomes, `external.include_unresolved`); excluded from the metapackage by `tax_status`.
 - Midpoint rooting (`outgroup.enabled: false`); Asgard outgroup caused the PhyloRank crash.
 - Windows: best-covered window crossing an intron in <=5% of covering genomes (`max_span_fraction`); `naive` variant is a negative control, off by default.
 - Genomic data only for intron analysis; TSA transcripts are spliced, so intron status for them comes from genome relatives or is unknown.
@@ -53,7 +53,7 @@ submit via `snakemake_mqsub`, the user starts big runs.
 - `.pixi/envs/notebook` lacks Biopython, so metapackage tests need the `default` env.
 - BUSCO transcriptome mode has no `Gene Start/End/Strand` columns (Sequence = `contig:start-end`, strand only in FASTA headers); `scripts/busco_table.py` normalises both modes.
 - Running a BUSCO job from the tool shell with `nohup &` dies when the tool call times out; use `setsid nohup ... < /dev/null &`.
-- The tree reads `metapackage_workflow/outputs/singlem/input`, which only holds genomes with `complete`/`partial` taxonomy. The 263 `unresolved` p10k genomes therefore do NOT reach the tree (the Oct 27 decision 'make them tree targets' is only half done: they pass BUSCO but not aggregation).
+- The tree reads `metapackage_workflow/outputs/singlem/input` (only `complete`/`partial` taxonomy); unresolved genomes reach it through the external route instead (dry run: 263 extra `run_external_busco` jobs). Use `--rerun-triggers input mtime` for dry runs: with `mtime` alone new jobs do not cascade to their consumers.
 - NCBI needs an explicit CA bundle (`/etc/pki/tls/certs/ca-bundle.crt`) in the sandbox. OrthoDB returns 403 there.
 - The sandbox cannot see `/work/microbiome/users/n9985158/` (the user's conda envs).
 - Sandbox `/tmp/pbs.*/opencode` is the writable scratch space; its job id changes per session.
